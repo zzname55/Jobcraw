@@ -1,0 +1,47 @@
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+BASE_DIR = Path(__file__).resolve().parent
+DATA_DIR = BASE_DIR / "data"
+EXPORT_DIR = DATA_DIR / "exports"
+LOG_DIR = DATA_DIR / "logs"
+DB_PATH = BASE_DIR / "jobs.db"
+
+load_dotenv(BASE_DIR / ".env")
+
+
+def env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
+SCRAPER_RATE_LIMIT_SECONDS = float(os.getenv("SCRAPER_RATE_LIMIT_SECONDS", "2"))
+MAX_JOBS_PER_SOURCE = int(os.getenv("MAX_JOBS_PER_SOURCE", "50"))
+DEFAULT_MIN_SCORE = int(os.getenv("DEFAULT_MIN_SCORE", "60"))
+
+# Only target companies under this many employees. Postings from companies that
+# are known to exceed this headcount are dropped before scoring and export.
+MAX_COMPANY_EMPLOYEES = int(os.getenv("MAX_COMPANY_EMPLOYEES", "200"))
+
+SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY", "")
+BING_SEARCH_API_KEY = os.getenv("BING_SEARCH_API_KEY", "")
+GOOGLE_SEARCH_API_KEY = os.getenv("GOOGLE_SEARCH_API_KEY", "")
+
+GOOGLE_SHEETS_ENABLED = env_bool("GOOGLE_SHEETS_ENABLED", False)
+GOOGLE_SHEETS_CREDENTIALS_PATH = os.getenv("GOOGLE_SHEETS_CREDENTIALS_PATH", "")
+GOOGLE_SHEETS_ID = os.getenv("GOOGLE_SHEETS_ID", "")
+
+NOTION_ENABLED = env_bool("NOTION_ENABLED", False)
+NOTION_API_KEY = os.getenv("NOTION_API_KEY", "")
+NOTION_DATABASE_ID = os.getenv("NOTION_DATABASE_ID", "")
+
+ENABLE_PLAYWRIGHT = env_bool("ENABLE_PLAYWRIGHT", False)
+HEADLESS_BROWSER = env_bool("HEADLESS_BROWSER", True)

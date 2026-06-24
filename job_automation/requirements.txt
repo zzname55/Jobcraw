@@ -1,0 +1,15 @@
+requests
+beautifulsoup4
+lxml
+pandas
+python-dotenv
+pydantic
+typer
+rich
+dateparser
+langdetect
+streamlit
+playwright
+pytest
+openpyxl
+python-docx
