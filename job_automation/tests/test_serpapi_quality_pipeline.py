@@ -167,6 +167,23 @@ def test_mismatches_score_low_or_zero(monkeypatch):
     assert scored["Industrial Automation Technician"] == 0
 
 
+def test_non_ai_titles_at_ai_companies_are_penalized():
+    # A posting whose description is full of AI/automation/junior/remote keywords
+    # must NOT score high unless the TITLE itself is an AI/automation role.
+    description = "We are an AI company. Use AI, automation, integrations and APIs. Junior friendly. Remote."
+    common = {"job_description": description, "remote_type": "remote", "region": "worldwide", "language": "en"}
+
+    support = Job(job_title="Product Support Specialist", **common)
+    devops = Job(job_title="DevOps Engineer", **common)
+    full_stack = Job(job_title="Full Stack Engineer", **common)
+    applied_ai = Job(job_title="Applied AI Engineer", **common)
+
+    assert calculate_relevance_score(support) < 60
+    assert calculate_relevance_score(devops) < 60
+    assert calculate_relevance_score(full_stack) < 60
+    assert calculate_relevance_score(applied_ai) >= 60
+
+
 def test_seniority_penalties_are_strong():
     titles = ["Senior AI Automation Engineer", "Lead AI Automation Engineer", "Principal AI Automation Architect", "Head of AI Automation"]
     for title in titles:

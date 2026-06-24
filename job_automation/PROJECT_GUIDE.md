@@ -299,7 +299,8 @@ Implemented in [`matching/scorer.py`](matching/scorer.py) → `calculate_score_b
 | −20 | "5+ years" (or 6/7/8/10+) experience |
 | −10 | onsite-only and region not in {dach, europe} |
 | −10 | QA/test-automation noise without AI/automation relevance |
-| −25 | weak role fit (title isn't a target and not clearly AI+automation) |
+| −45 | **title gate** — the **title** has no AI/automation signal and isn't a target role (so AI keywords in the *description* alone, e.g. a "Product Support Specialist" at an AI company, can't score high) |
+| −20 | off-target role title (`OFF_TARGET_TITLE_SIGNALS`: web developer, devops, account exec, support, …) when not a target title |
 | −25 | title isn't in the role-title family at all |
 | −100 | clearly unrelated title (`UNRELATED_TITLE_SIGNALS`) → effectively a hard reject |
 

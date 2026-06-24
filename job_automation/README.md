@@ -155,7 +155,8 @@ Important negative signals:
 - `-20` more than 5 years of experience
 - `-10` onsite-only outside target regions
 - `-10` QA/test automation noise without AI/workflow relevance
-- `-25` weak target-role fit
+- `-45` title gate: the title has no AI/automation signal and is not a target role (AI keywords in the description alone do not qualify)
+- `-20` off-target role title (web developer, devops, account executive, support, ...) unless it is a target title
 - `-25` title does not look like a target role family
 - `0` hard reject for clearly unrelated titles such as graphic designer, admin support, or customer support
 

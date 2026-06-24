@@ -8,6 +8,7 @@ from matching.keywords import (
     AI_SKILLS,
     AUTOMATION_SKILLS,
     JUNIOR_SIGNALS,
+    OFF_TARGET_TITLE_SIGNALS,
     QA_AUTOMATION_SIGNALS,
     ROLE_TITLE_SIGNALS,
     SENIOR_NEGATIVE_SIGNALS,
@@ -15,6 +16,7 @@ from matching.keywords import (
     TARGET_TITLES,
     UNRELATED_TITLE_SIGNALS,
 )
+from matching.relevance import is_relevant_text
 from matching.skills import term_in_text
 
 
@@ -98,8 +100,14 @@ def calculate_score_breakdown(job: Job) -> dict[str, int]:
         breakdown["penalty_score"] -= 10
     if contains_any(text, QA_AUTOMATION_SIGNALS) and not contains_any(text, AI_SKILLS + AUTOMATION_SKILLS[:8]):
         breakdown["penalty_score"] -= 10
-    if not (title_matches_target or (has_ai and has_automation) or ("llm" in title) or ("automation" in title and has_ai)):
-        breakdown["penalty_score"] -= 25
+    # The role must read like an AI/automation job in its TITLE, not merely have AI
+    # keywords somewhere in the description (e.g. a "Product Support Specialist" or
+    # "DevOps Engineer" at an AI company). Otherwise apply a decisive penalty.
+    title_is_relevant = title_matches_target or is_relevant_text(job.job_title)
+    if not title_is_relevant:
+        breakdown["penalty_score"] -= 45
+    if not title_matches_target and contains_any(title, OFF_TARGET_TITLE_SIGNALS):
+        breakdown["penalty_score"] -= 20
     if not contains_any(title, ROLE_TITLE_SIGNALS):
         breakdown["penalty_score"] -= 25
     if contains_any(title, UNRELATED_TITLE_SIGNALS):

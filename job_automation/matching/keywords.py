@@ -275,6 +275,39 @@ UNRELATED_TITLE_SIGNALS = [
     "marketing automation manager",
 ]
 
+# Roles that are clearly off-target even when the posting mentions AI (e.g. a
+# "Web Developer" or "DevOps Engineer" at an AI company). These are penalized in
+# the title unless the title is an explicit target role.
+OFF_TARGET_TITLE_SIGNALS = [
+    "web developer",
+    "web development",
+    "wordpress",
+    "devops",
+    "sre",
+    "site reliability",
+    "account executive",
+    "account manager",
+    "business development",
+    "sales representative",
+    "sales development",
+    "graphic",
+    "ux designer",
+    "ui designer",
+    "product designer",
+    "recruiter",
+    "talent acquisition",
+    "billing",
+    "bookkeeper",
+    "accountant",
+    "payroll",
+    "customer service",
+    "customer success",
+    "customer support",
+    "product support",
+    "support specialist",
+    "virtual assistant",
+]
+
 REGION_KEYWORDS = {
     "dach": [
         "germany",
