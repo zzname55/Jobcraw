@@ -35,6 +35,19 @@ SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY", "")
 BING_SEARCH_API_KEY = os.getenv("BING_SEARCH_API_KEY", "")
 GOOGLE_SEARCH_API_KEY = os.getenv("GOOGLE_SEARCH_API_KEY", "")
 
+# Search backend selection (see SCRAPER_ROADMAP.md). "serpapi" uses the paid
+# SerpAPI source, "crawler" uses the key-free sources (ATS APIs / feeds), and
+# "auto" prefers SerpAPI when a key is set. Currently informational; full
+# routing arrives with the discovery loop (roadmap Phase 4).
+SEARCH_BACKEND = os.getenv("SEARCH_BACKEND", "auto").lower()
+
+# Polite HTTP client knobs (shared by every scraper via scrapers/http_client.py).
+HTTP_MAX_RETRIES = int(os.getenv("HTTP_MAX_RETRIES", "3"))
+HTTP_JITTER_SECONDS = float(os.getenv("HTTP_JITTER_SECONDS", "0.75"))
+
+# List of target company ATS slugs for the key-free ATS scraper.
+COMPANIES_FILE = Path(os.getenv("COMPANIES_FILE", str(BASE_DIR / "companies.yaml")))
+
 GOOGLE_SHEETS_ENABLED = env_bool("GOOGLE_SHEETS_ENABLED", False)
 GOOGLE_SHEETS_CREDENTIALS_PATH = os.getenv("GOOGLE_SHEETS_CREDENTIALS_PATH", "")
 GOOGLE_SHEETS_ID = os.getenv("GOOGLE_SHEETS_ID", "")

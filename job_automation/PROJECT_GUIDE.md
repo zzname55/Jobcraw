@@ -148,6 +148,7 @@ Default when `--sources` is omitted: `remoteok, remotive, arbeitnow, weworkremot
 | `arbeitnow` | Public JSON API | No | `GET arbeitnow.com/api/job-board-api` pages 1–3 (Germany/EU focused). |
 | `weworkremotely` | HTML page parse | No | Parses the public `/remote-jobs/search?term=ai+automation` results with BeautifulSoup. |
 | `generic` | **Search API + page fetch** | **Yes (SerpAPI)** | The self-built search scraper. Builds targeted queries, calls SerpAPI, filters noise, optionally fetches each job-detail page for richer text. See `SCRAPER_ROADMAP.md`. |
+| `ats` | **ATS JSON APIs** | No | Key-free scraper for Greenhouse + Lever public job boards. Reads company slugs from `companies.yaml`, keeps AI/automation-relevant titles, maps to `Job`. This is the recommended SerpAPI-free path — see `SCRAPER_ROADMAP.md`. |
 | `mock` | Offline fixtures | No | `scrapers/mock_website_scraper.py` — deterministic jobs for testing the whole pipeline offline. |
 | `manual` | CSV import | No | Reads `manual_jobs.csv` (same columns as the `Job` model). |
 | `yc`, `wellfound`, `join`, `germantechjobs`, `berlinstartupjobs` | **Placeholders** | No | Return `[]` and log a note. They exist as extension points; these boards are JS-heavy or ToS-sensitive and should be reached via approved APIs/feeds, not raw scraping. |
@@ -156,9 +157,14 @@ Default when `--sources` is omitted: `remoteok, remotive, arbeitnow, weworkremot
 consumes one SerpAPI credit, so `--limit` on the `generic` source caps the number of queries. Without
 a key it logs and returns nothing — use the free API sources or `mock` instead.
 
-**To switch between SerpAPI and the own scraper:** today this is implicit (a SerpAPI key enables the
-SerpAPI path). The planned explicit `SEARCH_BACKEND` toggle and a key-free crawler are described in
-[`SCRAPER_ROADMAP.md`](SCRAPER_ROADMAP.md).
+**To run without SerpAPI:** use `--sources ats` (plus the free API sources). Put your target company
+slugs in `companies.yaml` and the `ats` source fetches their Greenhouse/Lever boards directly — no key,
+no blocking. The `SEARCH_BACKEND` env var (`serpapi` / `crawler` / `auto`) is the planned explicit
+toggle; full auto-routing arrives with the discovery loop (see [`SCRAPER_ROADMAP.md`](SCRAPER_ROADMAP.md)).
+
+All scrapers share one polite HTTP layer (`scrapers/http_client.py`): per-host rate limiting with
+jitter, retries with exponential backoff honoring `Retry-After`, and a rotating pool of honest
+User-Agent strings.
 
 ---
 
@@ -203,7 +209,11 @@ this schema and calls `BaseScraper.normalize_job()`. Key fields:
 | `MAX_COMPANY_EMPLOYEES` | `200` | Upper employee limit; companies above it are dropped. |
 | `DEFAULT_MIN_SCORE` | `60` | Default export threshold. |
 | `MAX_JOBS_PER_SOURCE` | `50` | Default per-source limit. |
-| `SCRAPER_RATE_LIMIT_SECONDS` | `2` | Sleep between HTTP requests in `BaseScraper.get()`. |
+| `SCRAPER_RATE_LIMIT_SECONDS` | `2` | Per-host delay between HTTP requests (shared HTTP client). |
+| `HTTP_MAX_RETRIES` | `3` | Retry attempts on transient HTTP errors (429/5xx/timeouts). |
+| `HTTP_JITTER_SECONDS` | `0.75` | Random jitter added to rate-limit and backoff waits. |
+| `SEARCH_BACKEND` | `auto` | `serpapi` / `crawler` / `auto` (informational today; see roadmap). |
+| `COMPANIES_FILE` | `companies.yaml` | Path to the ATS slug list used by `--sources ats`. |
 | `SERPAPI_API_KEY` | — | Enables the `generic` SerpAPI search path. |
 | `BING_SEARCH_API_KEY`, `GOOGLE_SEARCH_API_KEY` | — | Recognized but parsing not yet implemented. |
 | `GOOGLE_SHEETS_ENABLED` + `GOOGLE_SHEETS_CREDENTIALS_PATH` + `GOOGLE_SHEETS_ID` | off | Google Sheets export. |
@@ -352,6 +362,8 @@ Run with `pytest` (see the temp/cache note in [section 3](#3-quick-start)). File
 | `test_exporters.py` | Excel/Word files are produced; key columns exist. |
 | `test_word_from_excel.py` | Excel→Word round-trip honors the `Dismissed?` workflow. |
 | `test_generic_search_queries.py` | Query coverage / region term handling. |
+| `test_http_client.py` | Shared HTTP client: success path, retry/backoff, `Retry-After`, UA header. |
+| `test_ats_scraper.py` | ATS scraper: slug loading, Greenhouse/Lever mapping, title relevance filter, scoring flow. |
 
 Tests import top-level modules (`config`, `database.models`, …), so run them from inside the project
 folder. Network is never required — API sources are not hit in tests; the search scraper is mocked.
@@ -390,6 +402,7 @@ them:
 | Re-tune **scoring weights / penalties** | `matching/scorer.py` → `calculate_score_breakdown()`. |
 | Change **priority thresholds** | `matching/scorer.py` → `priority_from_score()`. |
 | Change the **company-size limit** | `.env` → `MAX_COMPANY_EMPLOYEES` (no code change). |
+| Track **specific companies** (no SerpAPI) | Add their Greenhouse/Lever slugs to `companies.yaml`, then run `--sources ats`. |
 | Adjust **regions / cities / countries** | `matching/keywords.py` → `REGION_KEYWORDS`; `matching/region_detection.py` → `COUNTRY_HINTS`, `CITY_HINTS`. |
 | Change **exported columns** | `exporters/xlsx_exporter.py` → `XLSX_COLUMNS`; `exporters/job_presenter.py` → `build_job_record`. |
 | Add a **new source** | Create `scrapers/<name>_scraper.py` subclassing `BaseScraper`, implement `search()`, map raw data to `Job`, call `self.normalize_job(job)`, then register it in `SCRAPER_REGISTRY` in `main.py`. |
@@ -400,10 +413,12 @@ After any behaviour change: run `pytest`, and **update this guide and the README
 
 ## 15. Roadmap and where to extend
 
-- **Self-built scraper without SerpAPI** — the biggest opportunity. A detailed, ethical plan to make
-  the own crawler strong, robust, and switchable lives in [`SCRAPER_ROADMAP.md`](SCRAPER_ROADMAP.md).
-- **Implement the placeholder sources** via official APIs / approved feeds (Greenhouse, Lever, Ashby,
-  Workable ATS endpoints are public JSON and ideal — see the roadmap).
+- **Self-built scraper without SerpAPI** — a detailed, ethical plan lives in
+  [`SCRAPER_ROADMAP.md`](SCRAPER_ROADMAP.md). **Phase 0 (shared polite HTTP client) and Phase 1
+  (Greenhouse + Lever ATS scraper) are implemented** as `scrapers/http_client.py` and
+  `scrapers/ats_scraper.py`. Next up: Ashby + Workable, public feeds/sitemaps, robots/caching
+  hardening, and the SerpAPI-discovery loop.
+- **Implement the placeholder sources** via official APIs / approved feeds.
 - **Bing/Google search parsing** — keys are recognized but parsing is unimplemented.
 - **Richer company intel** — a real headcount lookup would make the < 200-employee rule fire far more
   often (today most postings have unknown size and are kept by design).

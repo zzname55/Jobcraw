@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import logging
-import time
 from abc import ABC, abstractmethod
 from typing import Any
 
 import requests
 
-from config import SCRAPER_RATE_LIMIT_SECONDS
+from config import HTTP_JITTER_SECONDS, HTTP_MAX_RETRIES, SCRAPER_RATE_LIMIT_SECONDS
 from database.models import Job
 from matching.company_intel import extract_company_size
 from matching.language_detection import detect_language
@@ -15,6 +14,7 @@ from matching.region_detection import detect_location_details
 from matching.remote_detection import detect_remote_type
 from matching.seniority_detection import detect_seniority
 from matching.skills import extract_skills
+from scrapers.http_client import HttpClient
 
 
 class BaseScraper(ABC):
@@ -25,14 +25,15 @@ class BaseScraper(ABC):
     def __init__(self, limit: int = 50, rate_limit_seconds: float = SCRAPER_RATE_LIMIT_SECONDS) -> None:
         self.limit = limit
         self.rate_limit_seconds = rate_limit_seconds
-        self.session = requests.Session()
-        self.session.headers.update(
-            {
-                "User-Agent": "job-automation-mvp/1.0 (+respectful public job discovery)",
-                "Accept": "text/html,application/json,application/rss+xml",
-            }
-        )
         self.logger = logging.getLogger(self.source_name)
+        self.http = HttpClient(
+            rate_limit_seconds=rate_limit_seconds,
+            jitter_seconds=HTTP_JITTER_SECONDS,
+            max_retries=HTTP_MAX_RETRIES,
+            logger=self.logger,
+        )
+        # Backward-compatible alias; some scrapers/tests reference ``session``.
+        self.session = self.http.session
 
     @abstractmethod
     def search(self, region: str = "worldwide", remote: bool = True) -> list[Job]:
@@ -62,14 +63,10 @@ class BaseScraper(ABC):
         return job
 
     def respect_rate_limit(self) -> None:
-        if self.rate_limit_seconds > 0:
-            time.sleep(self.rate_limit_seconds)
+        self.http.respect_rate_limit()
 
     def handle_errors(self, error: Exception) -> None:
         self.logger.warning("%s skipped after error: %s", self.source_name, error)
 
     def get(self, url: str, **kwargs: Any) -> requests.Response:
-        self.respect_rate_limit()
-        response = self.session.get(url, timeout=20, **kwargs)
-        response.raise_for_status()
-        return response
+        return self.http.get(url, **kwargs)

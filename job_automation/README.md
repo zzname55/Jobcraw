@@ -81,6 +81,7 @@ Implemented sources:
 - Arbeitnow via public API
 - We Work Remotely public search page
 - Generic Search via SerpAPI when `SERPAPI_API_KEY` is set
+- ATS boards (Greenhouse + Lever) via `--sources ats`, key-free; list company slugs in `companies.yaml`
 - Manual import via `manual_jobs.csv`
 - Mock source for offline testing via `--sources mock`
 

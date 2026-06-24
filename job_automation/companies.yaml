@@ -1,0 +1,21 @@
+# Target companies for the key-free ATS scraper (run with: --sources ats)
+#
+# List the ATS "board slug" for each company you want to track. The slug is the
+# company identifier in its careers URL. Examples:
+#   Greenhouse board URL  https://boards.greenhouse.io/acme        -> slug: acme
+#   Lever board URL       https://jobs.lever.co/acme               -> slug: acme
+#
+# Only public ATS boards are queried (no API key, no login). The pipeline still
+# scores every posting and applies the <200-employee rule, so prefer small
+# startups here. Unknown company size is kept for manual review.
+#
+# Add your real targets below and remove these comments if you like. Anything
+# left empty is simply skipped.
+
+greenhouse:
+  # - your-greenhouse-slug
+  # - another-startup
+
+lever:
+  # - your-lever-slug
+  # - another-startup

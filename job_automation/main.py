@@ -20,6 +20,7 @@ from matching.deduplication import deduplicate_jobs, prepare_deduplication
 from matching.scorer import apply_score_breakdown, classify_company_fit, explain_score, priority_from_score
 from scrapers.berlin_startup_jobs_scraper import BerlinStartupJobsScraper
 from scrapers.arbeitnow_scraper import ArbeitnowScraper
+from scrapers.ats_scraper import AtsScraper
 from scrapers.generic_search_scraper import GenericSearchScraper
 from scrapers.german_tech_jobs_scraper import GermanTechJobsScraper
 from scrapers.join_scraper import JoinScraper
@@ -43,6 +44,7 @@ SCRAPER_REGISTRY = {
     "weworkremotely": WeWorkRemotelyScraper,
     "yc": YCJobsScraper,
     "generic": GenericSearchScraper,
+    "ats": AtsScraper,
     "mock": MockWebsiteScraper,
     "manual": ManualSourceScraper,
     "join": JoinScraper,
