@@ -164,6 +164,13 @@ crawler do the heavy, repeatable fetching against ATS APIs.
 Each phase is independently shippable and testable offline (monkeypatched HTTP + saved fixtures), the
 same pattern as `test_serpapi_quality_pipeline.py`.
 
+**SerpAPI scraper hardening (done, supports the discovery loop).** Reviewing a real 10-query capture
+exposed parsing gaps; the `generic` scraper now blocks dictionary/movie/streaming domains (single words
+like "junior" matched them), extracts companies from English "at", German "bei" and "@", returns
+`Unknown` for aggregator boards, and rejects numeric job ids, call-to-action phrases, departments and
+place names as company names. `SERPAPI_CAPTURE_DIR` saves raw responses so this kind of tuning happens
+offline without spending credits (`SERPAPI_FETCH_DETAILS=false` makes capture runs fast).
+
 ---
 
 ## 7. Definition of "strong" for this project

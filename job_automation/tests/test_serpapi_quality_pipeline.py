@@ -105,6 +105,48 @@ def test_country_subdomain_is_not_used_as_company_name():
     assert scraper._guess_company(title, domain) == "Unknown"
 
 
+# The following cases were derived from a real 10-query SerpAPI capture.
+
+def test_german_bei_and_english_at_company_extraction():
+    scraper = GenericSearchScraper(limit=10)
+    assert scraper._guess_company("Automation Engineer bei THRYVE | Jetzt bewerben!", "talents.studysmarter.de") == "THRYVE"
+    assert scraper._guess_company("(Junior) AI Automation Specialist (m/w/d) bei TeleClinic", "x.example") == "TeleClinic"
+    assert scraper._guess_company("AI Automation Builder at Kevin Meyer Consulting GmbH", "remoterocketship.com") == "Kevin Meyer Consulting GmbH"
+
+
+def test_numeric_job_id_and_cta_never_become_company():
+    scraper = GenericSearchScraper(limit=10)
+    assert scraper._is_bad_company("295827")
+    assert scraper._is_bad_company("Jetzt bewerben!")
+    # numeric job id is skipped; the real employer comes from the domain
+    assert scraper._guess_company("AI Implementation Specialist (f/m/d) - Germany - 295827", "jobs.siemens-energy.com") == "Siemens Energy"
+
+
+def test_reference_and_movie_domains_are_rejected_as_noise():
+    scraper = GenericSearchScraper(limit=10)
+    blocked = [
+        ("JUNIOR Definition & Meaning", "https://www.merriam-webster.com/dictionary/junior"),
+        ("Junior (1994)", "https://www.imdb.com/title/tt0110216/"),
+        ("Junior Official Trailer #1 - Danny DeVito Movie", "https://www.youtube.com/watch?v=abc"),
+        ("Watch Junior", "https://www.netflix.com/title/123"),
+        ("junior", "https://en.wiktionary.org/wiki/junior"),
+    ]
+    assert all(scraper._is_noisy_result(title, url) for title, url in blocked)
+
+
+def test_aggregator_domains_yield_unknown_company():
+    scraper = GenericSearchScraper(limit=10)
+    assert scraper._guess_company("AI Automation Specialist | Remote Jobs on AiDOOS", "aidoos.com") == "Unknown"
+    assert scraper._guess_company("AI Enablement Specialist", "himalayas.app") == "Unknown"
+
+
+def test_location_and_department_are_not_companies():
+    scraper = GenericSearchScraper(limit=10)
+    assert scraper._guess_company("Software Implementation Specialist - DACH in Hamburg HH", "recruit.net") == "Unknown"
+    assert scraper._guess_company("AI Implementation Specialist - Product and R&D Department", "dailyremote.com") == "Unknown"
+    assert scraper._guess_company("Mid/Senior AI Cinematic Video Editor (Full Remote, Spain)", "skillhatch.social-networking.me") == "Unknown"
+
+
 def test_strong_matches_survive_parsing_and_score_high(monkeypatch):
     jobs = parse_fixture_jobs(monkeypatch)
     scored = {job.job_title: calculate_relevance_score(job) for job in jobs}

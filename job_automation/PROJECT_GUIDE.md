@@ -215,6 +215,8 @@ this schema and calls `BaseScraper.normalize_job()`. Key fields:
 | `SEARCH_BACKEND` | `auto` | `serpapi` / `crawler` / `auto` (informational today; see roadmap). |
 | `COMPANIES_FILE` | `companies.yaml` | Path to the ATS slug list used by `--sources ats`. |
 | `SERPAPI_API_KEY` | — | Enables the `generic` SerpAPI search path. |
+| `SERPAPI_FETCH_DETAILS` | `true` | If false, the `generic` scraper skips slow job-detail page fetches. |
+| `SERPAPI_CAPTURE_DIR` | — | If set, dumps each raw SerpAPI response there so parsing can be iterated offline (no extra credits). |
 | `BING_SEARCH_API_KEY`, `GOOGLE_SEARCH_API_KEY` | — | Recognized but parsing not yet implemented. |
 | `GOOGLE_SHEETS_ENABLED` + `GOOGLE_SHEETS_CREDENTIALS_PATH` + `GOOGLE_SHEETS_ID` | off | Google Sheets export. |
 | `NOTION_ENABLED` + `NOTION_API_KEY` + `NOTION_DATABASE_ID` | off | Notion export. |
@@ -351,7 +353,7 @@ Run with `pytest` (see the temp/cache note in [section 3](#3-quick-start)). File
 |---|---|
 | `test_scorer.py` | Score breakdown and clamping. |
 | `test_mock_source_flow.py` | Full pipeline on mock data; good vs bad jobs score as expected. |
-| `test_serpapi_quality_pipeline.py` | Generic-scraper noise rejection, company/title cleanup, parsing→scoring, dedup, Excel-ready fields. **Runs offline** (HTTP is monkeypatched). |
+| `test_serpapi_quality_pipeline.py` | Generic-scraper noise rejection, company/title cleanup (incl. German "bei", job-id/CTA/place/department rejection, reference-domain blocking, aggregator→Unknown), parsing→scoring, dedup, Excel-ready fields. **Runs offline** (HTTP is monkeypatched). |
 | `test_company_size_filter.py` | `exceeds_employee_limit` table, place-name guard, mock pipeline drops >200-employee company, Excel→Word excludes large companies. |
 | `test_compensation.py` | Salary/hours extraction and target logic. |
 | `test_deduplication.py` | URL/signature dedup. |
@@ -375,11 +377,17 @@ folder. Network is never required — API sources are not hit in tests; the sear
 
 - **Conservative compensation parsing** — never fabricates salary/hours; "unknown" is a first-class
   state that only mildly penalizes.
-- **Strong noise rejection in the search scraper** — `blocked_domains`, `weak_aggregator_domains`,
-  noisy title/path patterns, and a "number-prefixed listicle" filter keep out social profiles, salary
-  guides, and aggregator spam.
+- **Strong noise rejection in the search scraper** — `blocked_domains` (now incl. dictionary, movie,
+  and streaming sites that match single words like "junior"), `weak_aggregator_domains`, noisy
+  title/path patterns, and a "number-prefixed listicle" filter keep out social profiles, salary
+  guides, reference pages, and aggregator spam.
+- **Robust company extraction** — handles English "at X", German "bei X", and "@ X"; aggregator/job-board
+  domains return `Unknown` instead of a board name; numeric job ids, call-to-action phrases
+  ("Jetzt bewerben!"), departments, and place names are never used as a company.
 - **Place names are never companies** — `is_location_name()` + domain-token guards stop bugs like
   "Egypt" appearing as a company.
+- **SerpAPI-frugal iteration** — `SERPAPI_CAPTURE_DIR` saves raw responses once so parsing can be
+  reviewed and improved offline without spending more credits.
 - **Multi-key dedup** — URL + key + fuzzy signature catches the same role reposted across boards.
 - **Idempotent storage** — SQLite upsert on `deduplication_key`; re-runs update instead of duplicating.
 - **Excel as the source of truth** — review in Excel, then regenerate Word from your edits.

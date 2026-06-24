@@ -48,6 +48,16 @@ HTTP_JITTER_SECONDS = float(os.getenv("HTTP_JITTER_SECONDS", "0.75"))
 # List of target company ATS slugs for the key-free ATS scraper.
 COMPANIES_FILE = Path(os.getenv("COMPANIES_FILE", str(BASE_DIR / "companies.yaml")))
 
+# When set, the Generic (SerpAPI) scraper dumps each raw API response to this
+# directory. Lets us capture real responses once and iterate on parsing offline
+# without spending more SerpAPI credits.
+SERPAPI_CAPTURE_DIR = os.getenv("SERPAPI_CAPTURE_DIR", "")
+
+# Whether the Generic scraper fetches each job-detail page for richer text.
+# Detail fetches improve quality but add many slow HTTP requests; turn off for
+# fast capture runs or when only SerpAPI snippets are needed.
+SERPAPI_FETCH_DETAILS = env_bool("SERPAPI_FETCH_DETAILS", True)
+
 GOOGLE_SHEETS_ENABLED = env_bool("GOOGLE_SHEETS_ENABLED", False)
 GOOGLE_SHEETS_CREDENTIALS_PATH = os.getenv("GOOGLE_SHEETS_CREDENTIALS_PATH", "")
 GOOGLE_SHEETS_ID = os.getenv("GOOGLE_SHEETS_ID", "")

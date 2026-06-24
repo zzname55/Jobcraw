@@ -17,6 +17,7 @@ __pycache__/
 # Generated artifacts
 data/exports/
 data/logs/
+data/serpapi_capture/
 
 # OS / editor
 .DS_Store

@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import json
 import re
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
-from config import BING_SEARCH_API_KEY, GOOGLE_SEARCH_API_KEY, SERPAPI_API_KEY
+from config import BING_SEARCH_API_KEY, GOOGLE_SEARCH_API_KEY, SERPAPI_API_KEY, SERPAPI_CAPTURE_DIR, SERPAPI_FETCH_DETAILS
 from database.models import Job
 from matching.keywords import TARGET_TITLES
-from matching.region_detection import is_location_name
+from matching.region_detection import GEOGRAPHIC_NAMES, is_location_name
 from scrapers.base_scraper import BaseScraper
 
 
@@ -31,6 +33,18 @@ class GenericSearchScraper(BaseScraper):
         "glassdoor.de",
         "glassdoor.co.in",
         "jobleads.com",
+        # Reference / dictionary / encyclopedia / movie / streaming / video.
+        # These match single dictionary words like "junior" and are never jobs.
+        "merriam-webster.com",
+        "wiktionary.org",
+        "wikipedia.org",
+        "dictionary.com",
+        "imdb.com",
+        "rottentomatoes.com",
+        "youtube.com",
+        "netflix.com",
+        "themoviedb.org",
+        "genaisummit.eu",
     }
     weak_aggregator_domains = {
         "indeed.com",
@@ -51,6 +65,25 @@ class GenericSearchScraper(BaseScraper):
         "builtinsf.com",
         "builtin.com",
         "builtinboston.com",
+        # Aggregators / job boards: the real employer is rarely the domain name,
+        # so fall back to "Unknown" instead of using the board name as company.
+        "himalayas.app",
+        "aidoos.com",
+        "lensa.com",
+        "jobgether.com",
+        "recruit.net",
+        "dailyremote.com",
+        "talent.outsized.com",
+        "startup.jobs",
+        "meetfrank.com",
+        "remoterocketship.com",
+        "africashore.com",
+        "jobtensor.com",
+        "vaia.com",
+        "studysmarter.de",
+        "social-networking.me",
+        "railway.app",
+        "page.gd",
     }
     geographic_domain_tokens = {
         "egypt",
@@ -84,6 +117,11 @@ class GenericSearchScraper(BaseScraper):
         "skills & advice",
         "specializing in",
         "community",
+        "definition & meaning",
+        "official trailer",
+        "testimonials",
+        "jobs - work from home",
+        "best remote",
     ]
     noisy_path_patterns = [
         "/jobs?",
@@ -179,7 +217,7 @@ class GenericSearchScraper(BaseScraper):
         jobs: list[Job] = []
         # For Generic Search, ``limit`` intentionally controls the number of
         # SerpAPI queries so test runs can cap API-credit usage predictably.
-        for query in self.build_queries(region, remote):
+        for index, query in enumerate(self.build_queries(region, remote)):
             try:
                 response = self.get(
                     "https://serpapi.com/search.json",
@@ -189,8 +227,22 @@ class GenericSearchScraper(BaseScraper):
             except Exception as error:
                 self.handle_errors(error)
                 continue
+            self._capture_response(index, query, data)
             jobs.extend(self._parse_serpapi_results(data, query))
         return jobs
+
+    def _capture_response(self, index: int, query: str, data: dict[str, Any]) -> None:
+        if not SERPAPI_CAPTURE_DIR:
+            return
+        capture_dir = Path(SERPAPI_CAPTURE_DIR)
+        capture_dir.mkdir(parents=True, exist_ok=True)
+        safe = re.sub(r"[^a-z0-9]+", "_", query.lower()).strip("_")[:60]
+        path = capture_dir / f"{index:02d}_{safe}.json"
+        try:
+            path.write_text(json.dumps({"query": query, "data": data}, ensure_ascii=False, indent=2), encoding="utf-8")
+            self.logger.info("captured SerpAPI response: %s", path)
+        except Exception as error:
+            self.handle_errors(error)
 
     def _parse_serpapi_results(self, data: dict[str, Any], query: str) -> list[Job]:
         jobs: list[Job] = []
@@ -207,7 +259,7 @@ class GenericSearchScraper(BaseScraper):
             title = self._clean_title(title)
             description = snippet
             page_title = ""
-            if detail_fetches < max_detail_fetches:
+            if SERPAPI_FETCH_DETAILS and detail_fetches < max_detail_fetches:
                 page_title, page_text = self._fetch_job_detail_text(link)
                 detail_fetches += 1
                 if page_title and not self._is_noisy_result(page_title, link):
@@ -251,36 +303,64 @@ class GenericSearchScraper(BaseScraper):
         return urlparse(link).netloc.lower().removeprefix("www.")
 
     def _guess_company(self, title: str, domain: str) -> str:
-        match = re.search(r"\bat\s+([^|-]+)", title, flags=re.IGNORECASE)
+        # Handle English "at X", German "bei X" and "@ X"; stop at separators so a
+        # trailing location or call-to-action is not captured as the company.
+        match = re.search(r"(?:\bat\s+|\bbei\s+|@\s*)([^|,–—-]+)", title, flags=re.IGNORECASE)
         if match:
             candidate = self._clean_company(match.group(1))
-            if candidate != "Unknown" and not is_location_name(candidate):
+            if not self._is_bad_company(candidate):
                 return candidate
         ignored_suffixes = {"jazzhr", "greenhouse", "lever", "workable", "ashby", "apply", "careers", "jobs"}
-        pieces = [piece.strip() for piece in re.split(r"\s[-|]\s", title) if piece.strip()]
+        pieces = [piece.strip() for piece in re.split(r"\s[-|–—]\s", title) if piece.strip()]
         if len(pieces) >= 2 and "built in" in pieces[-1].lower():
-            return self._clean_company(pieces[-2])
+            candidate = self._clean_company(pieces[-2])
+            if not self._is_bad_company(candidate):
+                return candidate
         for candidate in reversed(pieces[1:]):
             candidate_key = candidate.lower()
             if candidate_key in ignored_suffixes or re.search(r"\b(remote|hybrid|job|jobs|career|careers)\b", candidate_key):
                 continue
-            if is_location_name(candidate):
+            cleaned = self._clean_company(candidate)
+            if self._is_bad_company(cleaned):
                 continue
-            return self._clean_company(candidate)
+            return cleaned
         root_domain = ".".join(domain.split(".")[-2:])
-        if root_domain in self.job_board_domains:
+        if domain in self.job_board_domains or root_domain in self.job_board_domains:
             return "Unknown"
         parts = [
             part
             for part in domain.split(".")
             if part not in {"com", "co", "io", "jobs", "careers"} and part not in self.geographic_domain_tokens
         ]
-        return parts[0].replace("-", " ").title() if parts else "Unknown"
+        guess = parts[0].replace("-", " ").title() if parts else "Unknown"
+        return "Unknown" if self._is_bad_company(guess) else guess
 
     def _clean_company(self, value: str) -> str:
         cleaned = re.sub(r"\s+", " ", value or "").strip(" -–—|")
-        cleaned = re.sub(r"\s+(Djinni|JazzHR|Greenhouse|Lever|Ashby|Workable|Built In.*)$", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(
+            r"\s+(Djinni|JazzHR|Greenhouse|Lever|Ashby|Workable|Built In.*|Jetzt bewerben.*|Apply Now.*)$",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
         return cleaned.strip(" -–—|") or "Unknown"
+
+    def _is_bad_company(self, candidate: str) -> bool:
+        """Reject obviously-wrong company guesses (CTAs, job ids, places, noise)."""
+        key = " ".join((candidate or "").split()).strip(" ()[].,").lower()
+        if not key or key == "unknown":
+            return True
+        if is_location_name(candidate):
+            return True
+        letters = sum(character.isalpha() for character in candidate)
+        if letters < 2:  # pure job ids / numbers / punctuation
+            return True
+        tokens = re.findall(r"[a-zäöüß0-9&.+-]+", key)
+        if tokens and tokens[0] in GEOGRAPHIC_NAMES:  # leading place, e.g. "DACH in Hamburg"
+            return True
+        if re.search(r"\b(department|abteilung|team|jetzt bewerben|bewerben|apply now|work from home|home office|remote jobs|freelancers?)\b", key):
+            return True
+        return key in {"apply", "careers", "jobs", "remote", "hybrid", "new", "work from home", "freelance"}
 
     def _fetch_job_detail_text(self, link: str) -> tuple[str, str]:
         if not link.startswith(("http://", "https://")):
@@ -304,8 +384,15 @@ class GenericSearchScraper(BaseScraper):
 
     def _clean_title(self, title: str) -> str:
         cleaned = re.sub(r"\s+", " ", title or "").strip()
-        cleaned = re.sub(r"\s*\|\s*(Jobs?|Careers?|Apply|LinkedIn|Built In.*|Strider Jobs|Visa Sponsorship Jobs).*$", "", cleaned, flags=re.IGNORECASE)
-        return cleaned[:160]
+        cleaned = re.sub(
+            r"\s*\|\s*(Jobs?|Careers?|Apply|LinkedIn|Built In.*|Strider Jobs|Visa Sponsorship Jobs|Jetzt bewerben.*|Remote Jobs on.*).*$",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
+        # Trailing call-to-action after a dash, e.g. "... - Jetzt bewerben!".
+        cleaned = re.sub(r"\s*[-–—]\s*(Jetzt bewerben|Apply Now|Work From Home)\!?.*$", "", cleaned, flags=re.IGNORECASE)
+        return cleaned.strip(" -–—|")[:160]
 
     def _merge_description(self, snippet: str, page_text: str) -> str:
         values = [value.strip() for value in [snippet, page_text] if value and value.strip()]
