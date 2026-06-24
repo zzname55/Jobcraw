@@ -171,9 +171,17 @@ crawler do the heavy, repeatable fetching against ATS APIs.
   `tests/test_http_client.py`.
 - Future option: persist the HTTP cache across runs (currently in-memory per run).
 
-**Phase 4 — discovery loop**
-- Use a *small* SerpAPI budget to discover new ATS slugs, persist them into `companies.yaml`, then
-  fetch for free thereafter. This is how you stop paying SerpAPI over time.
+**Phase 4 — discovery loop** — ✅ **done**
+- `discover_ats_companies.py` (`python discover_ats_companies.py --limit 12`) spends a *small* SerpAPI
+  budget on `site:<ats>.<domain> "<keyword>"` queries to discover ATS company slugs, then merges them
+  into `companies.yaml` so the free ATS scraper fetches their jobs forever. This is how you stop paying
+  SerpAPI over time.
+- Budget allocation: 4 ATS domains × 3 keywords = 12 queries. A live run found ~114 company slugs from
+  12 credits; raw responses are captured (`SERPAPI_CAPTURE_DIR`) so slug extraction can be re-tuned
+  offline for free. Offline tests in `tests/test_discover.py`.
+- **Caveat:** discovery cannot know company size, so the list mixes small startups with large companies
+  (Reddit, Lyft, Palantir, …). Prune `companies.yaml` by hand, or rely on the <200-employee filter where
+  size is detectable and on scoring/`--min-score` to push senior/large-company roles down.
 
 **Phase 5 — optional JS rendering**
 - Only for sources whose ToS allows it and which have no API/feed, via Playwright, rate-limited.

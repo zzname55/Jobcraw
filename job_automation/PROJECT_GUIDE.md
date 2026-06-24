@@ -160,8 +160,10 @@ consumes one SerpAPI credit, so `--limit` on the `generic` source caps the numbe
 a key it logs and returns nothing — use the free API sources or `mock` instead.
 
 **To run without SerpAPI:** use `--sources ats` (plus the free API sources). Put your target company
-slugs in `companies.yaml` and the `ats` source fetches their Greenhouse/Lever boards directly — no key,
-no blocking. The `SEARCH_BACKEND` env var (`serpapi` / `crawler` / `auto`) is the planned explicit
+slugs in `companies.yaml` and the `ats` source fetches their Greenhouse/Lever/Ashby/Workable boards
+directly — no key, no blocking. To populate `companies.yaml` automatically, spend a small SerpAPI budget
+once with `python discover_ats_companies.py --limit 12` (discovers ~100 ATS slugs), then fetch their jobs
+for free thereafter. Prune large companies from the file by hand. The `SEARCH_BACKEND` env var (`serpapi` / `crawler` / `auto`) is the planned explicit
 toggle; full auto-routing arrives with the discovery loop (see [`SCRAPER_ROADMAP.md`](SCRAPER_ROADMAP.md)).
 
 All scrapers share one polite HTTP layer (`scrapers/http_client.py`): per-host rate limiting with
@@ -374,6 +376,7 @@ Run with `pytest` (see the temp/cache note in [section 3](#3-quick-start)). File
 | `test_ats_scraper.py` | ATS scraper: slug loading, Greenhouse/Lever/Ashby/Workable mapping, title relevance filter, scoring flow. |
 | `test_hackernews_scraper.py` | HN scraper: picks the "Who is hiring" thread, parses postings, filters noise, company/location/role cleanup. |
 | `test_rss_scraper.py` | Generic RSS scraper: company extraction (tag / companyName / "Company: Role"), German-colon guard, agent/ML relevance. |
+| `test_discover.py` | ATS discovery: slug extraction per provider, invalid-slug rejection, aggregation, companies.yaml merge. |
 | `test_scraper_quality.py` | Relevance pre-filter (AI/tool signals), text sanitizer, RemoteOK/Arbeitnow filtering, WeWorkRemotely RSS parsing. |
 
 Tests import top-level modules (`config`, `database.models`, …), so run them from inside the project

@@ -1,29 +1,124 @@
-# Target companies for the key-free ATS scraper (run with: --sources ats)
-#
-# List the ATS "board slug" for each company you want to track. The slug is the
-# company identifier in its careers URL. Examples:
-#   Greenhouse board URL  https://boards.greenhouse.io/acme        -> slug: acme
-#   Lever board URL       https://jobs.lever.co/acme               -> slug: acme
-#
-# Only public ATS boards are queried (no API key, no login). The pipeline still
-# scores every posting and applies the <200-employee rule, so prefer small
-# startups here. Unknown company size is kept for manual review.
-#
-# Add your real targets below and remove these comments if you like. Anything
-# left empty is simply skipped.
+# Target company ATS slugs for the key-free ATS scraper (--sources ats).
+# Auto-managed by discover_ats_companies.py; you can also edit by hand.
 
 greenhouse:
-  # - your-greenhouse-slug
-  # - another-startup
+  - 6sense
+  - acquia
+  - andurilindustries
+  - appliedintuition
+  - assemblyai
+  - blacksky
+  - cerebrassystems
+  - clear
+  - cobaltio
+  - cognite
+  - connecteam
+  - coupang
+  - fundraiseup
+  - iherb
+  - instacart
+  - interdependence
+  - justworks
+  - klaviyo
+  - lyft
+  - marqeta
+  - mqreferrals
+  - ombud
+  - pathrobotics
+  - reddit
+  - roku
+  - sezzle
+  - trustpilot
+  - unity3d
 
 lever:
-  # - your-lever-slug
-  # - another-startup
+  - adventus
+  - aifund
+  - aircall
+  - alice-bob
+  - appzen
+  - bumbleinc
+  - casino-cash-trac
+  - collate
+  - dadavidson
+  - egen
+  - extremenetworks
+  - firstup
+  - hive
+  - ifm-us
+  - influur
+  - insify
+  - jobgether
+  - lodgify
+  - machinalabs
+  - mistral
+  - palantir
+  - pointb
+  - qloo
+  - quincus
+  - simonmed
+  - sonarsource
+  - whoop
+  - xsolla
+  - zoox
 
 ashby:
-  # - your-ashby-slug
-  # - another-startup
+  - arena
+  - benchling
+  - betterup
+  - campfire
+  - cognition
+  - corridor
+  - crusoe
+  - epistemix
+  - hackerone
+  - handshake
+  - harmattan-ai
+  - harvey
+  - helm-ai
+  - krea
+  - mai
+  - marianaminerals
+  - mercor
+  - ncontracts
+  - novig
+  - orbital
+  - percepta
+  - pragmatico
+  - ramp
+  - ravenna
+  - reducto
+  - shepherd
+  - siftstack
+  - trm-labs
+  - zapier
 
 workable:
-  # - your-workable-slug
-  # - another-startup
+  - becoming
+  - c-the-signs
+  - canopy-7
+  - deeplight
+  - devsinc-17
+  - elvtrcom
+  - finaira
+  - fridababy
+  - gbg
+  - huggingface
+  - iceye
+  - innopeaktech
+  - interimage
+  - keywords-intl1
+  - obdeleven
+  - pairedrecruiting
+  - pavago
+  - pearltalent
+  - pereview-software
+  - pfm-global-fzco
+  - qodea
+  - rockstar-3
+  - smartnews
+  - squiz
+  - teamified
+  - theinclab
+  - valsoft-corp
+  - verneek

@@ -111,6 +111,18 @@ Each generated query consumes one SerpAPI search credit. The generic search sour
 python main.py --sources generic --limit 20 --region europe --remote true --min-score 50 --export all
 ```
 
+### Discover ATS companies (frugal SerpAPI use)
+
+Instead of spending credits on individual jobs, spend a few on discovering company ATS boards, then
+fetch their jobs for free forever via `--sources ats`:
+
+```bash
+python discover_ats_companies.py --limit 12   # ~12 credits -> ~100 company slugs in companies.yaml
+python main.py --sources ats --min-score 60 --export xlsx
+```
+
+Discovery cannot know company size, so prune large companies from `companies.yaml` by hand.
+
 ## Company Size Filter
 
 This tool intentionally targets **only companies with fewer than 200 employees** (startups and small/mid-size teams).
