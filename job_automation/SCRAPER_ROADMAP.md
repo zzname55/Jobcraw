@@ -183,8 +183,13 @@ crawler do the heavy, repeatable fetching against ATS APIs.
   (Reddit, Lyft, Palantir, …). Prune `companies.yaml` by hand, or rely on the <200-employee filter where
   size is detectable and on scoring/`--min-score` to push senior/large-company roles down.
 
-**Phase 5 — optional JS rendering**
-- Only for sources whose ToS allows it and which have no API/feed, via Playwright, rate-limited.
+**Phase 5 — optional JS rendering** — ✅ **done (opt-in capability)**
+- `scrapers/render.py` `render_html(url)` renders a JavaScript page with Playwright, gated behind
+  `ENABLE_PLAYWRIGHT`, and raises `PlaywrightNotAvailable` when disabled or not installed so callers
+  fall back gracefully. Offline tests in `tests/test_render.py` (mocked Playwright; no browser install).
+- Intentionally minimal: every current source works via an API or feed, so there is no JS-only target
+  to wire up today. The capability is here for a future ToS-allowed, API-less source, and any scraper
+  using it must still respect robots.txt and rate limits.
 
 Each phase is independently shippable and testable offline (monkeypatched HTTP + saved fixtures), the
 same pattern as `test_serpapi_quality_pipeline.py`.

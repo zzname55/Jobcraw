@@ -377,6 +377,7 @@ Run with `pytest` (see the temp/cache note in [section 3](#3-quick-start)). File
 | `test_hackernews_scraper.py` | HN scraper: picks the "Who is hiring" thread, parses postings, filters noise, company/location/role cleanup. |
 | `test_rss_scraper.py` | Generic RSS scraper: company extraction (tag / companyName / "Company: Role"), German-colon guard, agent/ML relevance. |
 | `test_discover.py` | ATS discovery: slug extraction per provider, invalid-slug rejection, aggregation, companies.yaml merge. |
+| `test_render.py` | Opt-in Playwright JS rendering: disabled raises, enabled returns rendered HTML (mocked). |
 | `test_scraper_quality.py` | Relevance pre-filter (AI/tool signals), text sanitizer, RemoteOK/Arbeitnow filtering, WeWorkRemotely RSS parsing. |
 
 Tests import top-level modules (`config`, `database.models`, …), so run them from inside the project
@@ -443,15 +444,17 @@ After any behaviour change: run `pytest`, and **update this guide and the README
 
 ## 15. Roadmap and where to extend
 
-- **Self-built scraper without SerpAPI** — a detailed, ethical plan lives in
-  [`SCRAPER_ROADMAP.md`](SCRAPER_ROADMAP.md). **Phase 0 (shared polite HTTP client) and Phase 1
-  (Greenhouse + Lever ATS scraper) are implemented** as `scrapers/http_client.py` and
-  `scrapers/ats_scraper.py`. Next up: Ashby + Workable, public feeds/sitemaps, robots/caching
-  hardening, and the SerpAPI-discovery loop.
-- **Implement the placeholder sources** via official APIs / approved feeds.
-- **Bing/Google search parsing** — keys are recognized but parsing is unimplemented.
+- **Self-built scraper without SerpAPI** — the full plan lives in
+  [`SCRAPER_ROADMAP.md`](SCRAPER_ROADMAP.md). **All phases are now implemented:** Phase 0 shared polite
+  HTTP client, Phase 1 ATS scraper (Greenhouse + Lever + Ashby + Workable), Phase 2 feeds (We Work
+  Remotely RSS, Hacker News "Who is hiring", generic RSS), Phase 3 politeness hardening (robots.txt,
+  conditional caching, circuit breaker), Phase 4 SerpAPI discovery loop (`discover_ats_companies.py`),
+  and Phase 5 opt-in Playwright rendering (`scrapers/render.py`).
 - **Richer company intel** — a real headcount lookup would make the < 200-employee rule fire far more
-  often (today most postings have unknown size and are kept by design).
+  often, which matters most for the discovery-loop companies (today most postings have unknown size and
+  are kept by design).
+- **Bing/Google search parsing** — keys are recognized but parsing is unimplemented.
+- **Implement the placeholder sources** (YC, Wellfound, JOIN, …) via official APIs / approved feeds.
 
 ---
 
