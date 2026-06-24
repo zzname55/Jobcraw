@@ -140,6 +140,8 @@ crawler do the heavy, repeatable fetching against ATS APIs.
 - `scrapers/ats_scraper.py` fetches all four ATS public JSON boards, keeps AI/automation-relevant
   titles, maps to `Job`, and runs the normal enrichment. Slugs come from `companies.yaml`.
 - Registered as `--sources ats`. Offline fixture tests in `tests/test_ats_scraper.py`.
+- Workable was also live-validated against real boards (Hugging Face, Skroutz); the live review fixed
+  remote detection to use Workable's actual `telecommuting` field.
 - **TODO:** seed `companies.yaml` with your real targets.
 
 **Phase 2 — feeds & sitemaps** — 🟡 **mostly done**

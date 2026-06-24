@@ -211,8 +211,15 @@ class AtsScraper(BaseScraper):
             location = " ".join(
                 part for part in [str(item.get("city") or ""), str(item.get("country") or "")] if part
             ) or str(item.get("location") or "")
+            # Workable marks remote with a ``telecommuting`` boolean; some payloads
+            # also carry a ``workplace_type`` string. Honor both; fall back to text.
             workplace = str(item.get("workplace_type") or "").lower()
-            remote_type = "remote" if "remote" in workplace else ("hybrid" if "hybrid" in workplace else "unknown")
+            if item.get("telecommuting") or "remote" in workplace:
+                remote_type = "remote"
+            elif "hybrid" in workplace:
+                remote_type = "hybrid"
+            else:
+                remote_type = "unknown"
             job = Job(
                 job_title=title,
                 company_name=str(payload.get("name") or self._prettify_slug(slug)),
