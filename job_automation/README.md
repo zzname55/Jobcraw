@@ -6,6 +6,11 @@ The project collects public job postings, normalizes them, detects language/seni
 
 **Only companies with fewer than 200 employees are targeted.** Postings from companies that are known to exceed 200 employees are dropped before scoring and export, so the focus stays on startups and small/mid-size teams. See [Company Size Filter](#company-size-filter).
 
+## Documentation
+
+- **[PROJECT_GUIDE.md](PROJECT_GUIDE.md)** — the full reference: architecture, sources/APIs, input/output, exact scoring metrics, detection, filters, tests, and **how to customize this for your own job search**. Read this first if you want to change anything (it is written so an AI assistant can explain the system to you).
+- **[SCRAPER_ROADMAP.md](SCRAPER_ROADMAP.md)** — the plan for making the self-built crawler strong and reliable, and for switching between SerpAPI and a key-free crawler.
+
 ## Installation
 
 Requirement: Python 3.11+
