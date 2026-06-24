@@ -5,6 +5,7 @@ from typing import Any
 from bs4 import BeautifulSoup
 
 from database.models import Job
+from matching.relevance import is_relevant_text
 from scrapers.base_scraper import BaseScraper
 
 
@@ -25,6 +26,9 @@ class RemoteOKScraper(BaseScraper):
             if not isinstance(item, dict) or "position" not in item:
                 continue
             job = self.parse_job(item)
+            # RemoteOK's /api returns the whole board; keep only AI/automation roles.
+            if not is_relevant_text(job.text_blob()):
+                continue
             jobs.append(self.normalize_job(job))
             if len(jobs) >= self.limit:
                 break

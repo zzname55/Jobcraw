@@ -136,17 +136,23 @@ crawler do the heavy, repeatable fetching against ATS APIs.
   `hishel` later is a drop-in because everything goes through one client. robots.txt + HTTP caching
   hooks are stubbed for Phase 3.
 
-**Phase 1 — ATS engine (biggest win)** — ✅ **Greenhouse + Lever done; Ashby + Workable next**
-- `scrapers/ats_scraper.py` fetches Greenhouse + Lever public JSON, keeps AI/automation-relevant
+**Phase 1 — ATS engine (biggest win)** — ✅ **Greenhouse + Lever + Ashby done; Workable next**
+- `scrapers/ats_scraper.py` fetches Greenhouse + Lever + Ashby public JSON, keeps AI/automation-relevant
   titles, maps to `Job`, and runs the normal enrichment. Slugs come from `companies.yaml`.
 - Registered as `--sources ats`. Offline fixture tests in `tests/test_ats_scraper.py`.
-- **TODO:** add Ashby + Workable providers; seed `companies.yaml` with your real targets.
+- **TODO:** add the Workable provider; seed `companies.yaml` with your real targets.
 
-**Phase 2 — feeds & sitemaps**
-- Add WeWorkRemotely RSS, HN "Who is hiring", and sitemap enumeration for known small-company boards.
+**Phase 2 — feeds & sitemaps** — 🟡 **started**
+- We Work Remotely now uses its public RSS feed (`/remote-jobs.rss`) instead of the 403 HTML search
+  (`scrapers/weworkremotely_scraper.py`).
+- Broad feeds (RemoteOK, Arbeitnow, RSS) now run a shared relevance pre-filter (`matching/relevance.py`)
+  so the per-source budget is spent on AI/automation roles, and a text sanitizer
+  (`base_scraper.clean_field`) strips upstream-corrupted characters.
+- **TODO:** Hacker News "Who is hiring" (Algolia API), more startup RSS feeds, sitemap enumeration.
 
-**Phase 3 — politeness hardening**
-- Per-host limiter + jitter, backoff on 429/503, conditional-request caching, UA pool, circuit breaker.
+**Phase 3 — politeness hardening** — 🟡 **partly done**
+- Done via the shared HTTP client: per-host limiter + jitter, backoff on 429/503, UA pool.
+- **TODO:** conditional-request/HTTP caching, robots.txt enforcement, circuit breaker.
 
 **Phase 4 — discovery loop**
 - Use a *small* SerpAPI budget to discover new ATS slugs, persist them into `companies.yaml`, then

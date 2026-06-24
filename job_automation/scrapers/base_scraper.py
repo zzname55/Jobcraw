@@ -17,6 +17,26 @@ from matching.skills import extract_skills
 from scrapers.http_client import HttpClient
 
 
+# U+FFFD, built via chr() so no literal special character lives in this source.
+_REPLACEMENT_CHAR = chr(0xFFFD)
+
+
+def clean_field(value: str) -> str:
+    """Remove source-corrupted characters and collapse whitespace.
+
+    Some feeds (e.g. Arbeitnow) already contain U+FFFD replacement characters
+    where a symbol such as the euro sign was mangled upstream, plus the odd stray
+    control byte. Strip those so they never reach the exports; tab and newline are
+    kept, everything below 0x20 is dropped.
+    """
+    if not value:
+        return value
+    cleaned = "".join(
+        ch for ch in value if ch in ("\t", "\n") or (ch >= " " and ch != _REPLACEMENT_CHAR)
+    )
+    return " ".join(cleaned.split())
+
+
 class BaseScraper(ABC):
     source_name = "base"
     base_url = ""
@@ -43,6 +63,12 @@ class BaseScraper(ABC):
         return Job(**raw_job)
 
     def normalize_job(self, job: Job) -> Job:
+        # Strip source-corrupted characters before detection and export.
+        job.job_title = clean_field(job.job_title)
+        job.company_name = clean_field(job.company_name)
+        job.location = clean_field(job.location)
+        job.job_description = clean_field(job.job_description)
+        job.salary = clean_field(job.salary)
         text = job.text_blob()
         job.source_platform = job.source_platform or self.source_name
         job.source_type = job.source_type or self.source_type

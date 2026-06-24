@@ -59,7 +59,7 @@ def load_companies(path: Path | str) -> dict[str, list[str]]:
         return {}
     data = yaml.safe_load(file_path.read_text(encoding="utf-8")) or {}
     companies: dict[str, list[str]] = {}
-    for provider in ("greenhouse", "lever"):
+    for provider in ("greenhouse", "lever", "ashby"):
         raw = data.get(provider) or []
         companies[provider] = [str(slug).strip() for slug in raw if str(slug).strip()]
     return companies
@@ -68,9 +68,9 @@ def load_companies(path: Path | str) -> dict[str, list[str]]:
 class AtsScraper(BaseScraper):
     """Key-free scraper for public Applicant Tracking System (ATS) job boards.
 
-    Hits the documented public JSON endpoints of Greenhouse and Lever, which are
-    meant to be consumed and are not anti-bot protected. Company slugs come from
-    ``companies.yaml`` (see SCRAPER_ROADMAP.md, section 2).
+    Hits the documented public JSON endpoints of Greenhouse, Lever and Ashby,
+    which are meant to be consumed and are not anti-bot protected. Company slugs
+    come from ``companies.yaml`` (see SCRAPER_ROADMAP.md, section 2).
     """
 
     source_name = "ats"
@@ -82,19 +82,21 @@ class AtsScraper(BaseScraper):
 
     def search(self, region: str = "worldwide", remote: bool = True) -> list[Job]:
         companies = load_companies(self.companies_file)
-        if not companies.get("greenhouse") and not companies.get("lever"):
+        providers = (
+            ("greenhouse", self._fetch_greenhouse),
+            ("lever", self._fetch_lever),
+            ("ashby", self._fetch_ashby),
+        )
+        if not any(companies.get(name) for name, _ in providers):
             self.logger.info("No ATS company slugs configured in %s. Skipping ATS scraper.", self.companies_file)
             return []
 
         jobs: list[Job] = []
-        for slug in companies.get("greenhouse", []):
-            jobs.extend(self._fetch_greenhouse(slug))
-            if len(jobs) >= self.limit:
-                return jobs[: self.limit]
-        for slug in companies.get("lever", []):
-            jobs.extend(self._fetch_lever(slug))
-            if len(jobs) >= self.limit:
-                return jobs[: self.limit]
+        for name, fetch in providers:
+            for slug in companies.get(name, []):
+                jobs.extend(fetch(slug))
+                if len(jobs) >= self.limit:
+                    return jobs[: self.limit]
         return jobs[: self.limit]
 
     def _fetch_greenhouse(self, slug: str) -> list[Job]:
@@ -155,6 +157,37 @@ class AtsScraper(BaseScraper):
                 job_url=str(item.get("hostedUrl") or item.get("applyUrl") or ""),
                 date_posted=str(item.get("createdAt") or ""),
                 job_description=" ".join(part for part in [commitment, team, description] if part),
+            )
+            jobs.append(self.normalize_job(job))
+            if len(jobs) >= self.limit:
+                break
+        return jobs
+
+    def _fetch_ashby(self, slug: str) -> list[Job]:
+        url = f"https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true"
+        try:
+            payload = self.get(url).json()
+        except Exception as error:
+            self.handle_errors(error)
+            return []
+
+        jobs: list[Job] = []
+        for item in payload.get("jobs", []) if isinstance(payload, dict) else []:
+            title = str(item.get("title") or "")
+            if not self._is_relevant_title(title):
+                continue
+            location = str(item.get("location") or "")
+            description = str(item.get("descriptionPlain") or "") or self._html_to_text(str(item.get("descriptionHtml") or ""))
+            job = Job(
+                job_title=title,
+                company_name=self._prettify_slug(slug),
+                location=location,
+                remote_type="remote" if item.get("isRemote") else "unknown",
+                source_platform=f"ashby:{slug}",
+                source_type=self.source_type,
+                job_url=str(item.get("jobUrl") or item.get("applyUrl") or ""),
+                date_posted=str(item.get("publishedAt") or ""),
+                job_description=description,
             )
             jobs.append(self.normalize_job(job))
             if len(jobs) >= self.limit:

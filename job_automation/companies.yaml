@@ -19,3 +19,7 @@ greenhouse:
 lever:
   # - your-lever-slug
   # - another-startup
+
+ashby:
+  # - your-ashby-slug
+  # - another-startup

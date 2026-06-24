@@ -44,13 +44,37 @@ LEVER_PAYLOAD = [
 ]
 
 
-def _write_companies(tmp_path, greenhouse=None, lever=None):
+ASHBY_PAYLOAD = {
+    "jobs": [
+        {
+            "title": "Junior AI Solutions Engineer",
+            "location": "Remote - Europe",
+            "isRemote": True,
+            "jobUrl": "https://jobs.ashbyhq.com/opscraft/abc",
+            "publishedAt": "2026-06-18T10:00:00Z",
+            "descriptionPlain": "Implement AI agent workflows and LLM tooling for customers.",
+        },
+        {
+            "title": "Office Coordinator",
+            "location": "Berlin",
+            "isRemote": False,
+            "jobUrl": "https://jobs.ashbyhq.com/opscraft/xyz",
+            "descriptionPlain": "Coordinate the office.",
+        },
+    ]
+}
+
+
+def _write_companies(tmp_path, greenhouse=None, lever=None, ashby=None):
     path = tmp_path / "companies.yaml"
     lines = ["greenhouse:"]
     for slug in greenhouse or []:
         lines.append(f"  - {slug}")
     lines.append("lever:")
     for slug in lever or []:
+        lines.append(f"  - {slug}")
+    lines.append("ashby:")
+    for slug in ashby or []:
         lines.append(f"  - {slug}")
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
@@ -69,16 +93,19 @@ def _patch_http(scraper, monkeypatch):
             return DummyResponse(GREENHOUSE_PAYLOAD)
         if "lever" in url:
             return DummyResponse(LEVER_PAYLOAD)
+        if "ashby" in url:
+            return DummyResponse(ASHBY_PAYLOAD)
         return DummyResponse({})
 
     monkeypatch.setattr(scraper, "get", fake_get)
 
 
 def test_load_companies_reads_slugs(tmp_path):
-    path = _write_companies(tmp_path, greenhouse=["flowpilot"], lever=["agentstack"])
+    path = _write_companies(tmp_path, greenhouse=["flowpilot"], lever=["agentstack"], ashby=["opscraft"])
     companies = load_companies(path)
     assert companies["greenhouse"] == ["flowpilot"]
     assert companies["lever"] == ["agentstack"]
+    assert companies["ashby"] == ["opscraft"]
 
 
 def test_load_companies_missing_file_returns_empty(tmp_path):
@@ -86,7 +113,7 @@ def test_load_companies_missing_file_returns_empty(tmp_path):
 
 
 def test_ats_scraper_maps_and_filters_jobs(tmp_path, monkeypatch):
-    path = _write_companies(tmp_path, greenhouse=["flowpilot"], lever=["agentstack"])
+    path = _write_companies(tmp_path, greenhouse=["flowpilot"], lever=["agentstack"], ashby=["opscraft"])
     scraper = AtsScraper(limit=50, companies_file=path, rate_limit_seconds=0)
     _patch_http(scraper, monkeypatch)
 
@@ -96,8 +123,14 @@ def test_ats_scraper_maps_and_filters_jobs(tmp_path, monkeypatch):
     # Relevant AI/automation titles are kept; office/sales roles are filtered out.
     assert "Junior AI Automation Engineer" in titles
     assert "AI Workflow Specialist" in titles
+    assert "Junior AI Solutions Engineer" in titles  # from Ashby
     assert "Office Manager" not in titles
     assert "Account Executive" not in titles
+    assert "Office Coordinator" not in titles  # from Ashby
+
+    ashby_job = next(job for job in jobs if job.source_platform == "ashby:opscraft")
+    assert ashby_job.job_url == "https://jobs.ashbyhq.com/opscraft/abc"
+    assert ashby_job.remote_type == "remote"
 
     greenhouse_job = next(job for job in jobs if job.source_platform == "greenhouse:flowpilot")
     assert greenhouse_job.company_name == "Flowpilot"

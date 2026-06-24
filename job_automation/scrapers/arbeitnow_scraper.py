@@ -5,6 +5,7 @@ from typing import Any
 from bs4 import BeautifulSoup
 
 from database.models import Job
+from matching.relevance import is_relevant_text
 from scrapers.base_scraper import BaseScraper
 
 
@@ -15,16 +16,23 @@ class ArbeitnowScraper(BaseScraper):
     def search(self, region: str = "europe", remote: bool = True) -> list[Job]:
         jobs: list[Job] = []
         page = 1
-        while len(jobs) < self.limit and page <= 3:
+        # Arbeitnow returns a general board; scan more pages but keep only relevant
+        # AI/automation roles so the per-source budget is not wasted on noise.
+        while len(jobs) < self.limit and page <= 5:
             try:
                 response = self.get(self.base_url, params={"page": page})
                 payload = response.json()
             except Exception as error:
                 self.handle_errors(error)
                 break
-            for item in payload.get("data", []):
-                job = self.normalize_job(self.parse_job(item))
-                jobs.append(job)
+            data = payload.get("data", [])
+            if not data:
+                break
+            for item in data:
+                job = self.parse_job(item)
+                if not is_relevant_text(job.text_blob()):
+                    continue
+                jobs.append(self.normalize_job(job))
                 if len(jobs) >= self.limit:
                     break
             page += 1
