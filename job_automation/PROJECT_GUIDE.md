@@ -213,6 +213,9 @@ this schema and calls `BaseScraper.normalize_job()`. Key fields:
 | `SCRAPER_RATE_LIMIT_SECONDS` | `2` | Per-host delay between HTTP requests (shared HTTP client). |
 | `HTTP_MAX_RETRIES` | `3` | Retry attempts on transient HTTP errors (429/5xx/timeouts). |
 | `HTTP_JITTER_SECONDS` | `0.75` | Random jitter added to rate-limit and backoff waits. |
+| `HTTP_RESPECT_ROBOTS` | `true` | Honor each host's robots.txt; disallowed URLs are skipped. |
+| `HTTP_ENABLE_CACHE` | `true` | Conditional requests: remember ETag/Last-Modified, reuse on 304. |
+| `HTTP_CIRCUIT_BREAKER_THRESHOLD` | `5` | Consecutive per-host failures before the host is skipped for the run. |
 | `SEARCH_BACKEND` | `auto` | `serpapi` / `crawler` / `auto` (informational today; see roadmap). |
 | `COMPANIES_FILE` | `companies.yaml` | Path to the ATS slug list used by `--sources ats`. |
 | `SERPAPI_API_KEY` | — | Enables the `generic` SerpAPI search path. |
@@ -365,7 +368,7 @@ Run with `pytest` (see the temp/cache note in [section 3](#3-quick-start)). File
 | `test_exporters.py` | Excel/Word files are produced; key columns exist. |
 | `test_word_from_excel.py` | Excel→Word round-trip honors the `Dismissed?` workflow. |
 | `test_generic_search_queries.py` | Query coverage / region term handling. |
-| `test_http_client.py` | Shared HTTP client: success path, retry/backoff, `Retry-After`, UA header. |
+| `test_http_client.py` | Shared HTTP client: success path, retry/backoff, `Retry-After`, UA header, robots.txt enforcement, conditional-request 304 caching, circuit breaker. |
 | `test_ats_scraper.py` | ATS scraper: slug loading, Greenhouse/Lever/Ashby/Workable mapping, title relevance filter, scoring flow. |
 | `test_hackernews_scraper.py` | HN scraper: picks the "Who is hiring" thread, parses postings, filters noise, company/location/role cleanup. |
 | `test_scraper_quality.py` | Relevance pre-filter (AI/tool signals), text sanitizer, RemoteOK/Arbeitnow filtering, WeWorkRemotely RSS parsing. |
@@ -401,6 +404,10 @@ folder. Network is never required — API sources are not hit in tests; the sear
 - **Text sanitizer** — `clean_field()` strips upstream-corrupted characters (U+FFFD, stray control
   bytes) so garbled symbols never reach the exports.
 - **Feeds over blocked HTML** — We Work Remotely is read via its RSS feed instead of the 403 search page.
+- **Polite by construction** — the shared HTTP client honors robots.txt, sends conditional requests
+  (ETag/Last-Modified → 304 reuse), and trips a per-host circuit breaker after repeated failures, on
+  top of per-host rate limiting, jittered backoff, and a rotating User-Agent pool. All of the project's
+  real sources are allowed by their robots.txt.
 
 ---
 

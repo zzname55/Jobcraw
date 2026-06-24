@@ -44,6 +44,10 @@ SEARCH_BACKEND = os.getenv("SEARCH_BACKEND", "auto").lower()
 # Polite HTTP client knobs (shared by every scraper via scrapers/http_client.py).
 HTTP_MAX_RETRIES = int(os.getenv("HTTP_MAX_RETRIES", "3"))
 HTTP_JITTER_SECONDS = float(os.getenv("HTTP_JITTER_SECONDS", "0.75"))
+# Phase 3 politeness hardening.
+HTTP_RESPECT_ROBOTS = env_bool("HTTP_RESPECT_ROBOTS", True)
+HTTP_ENABLE_CACHE = env_bool("HTTP_ENABLE_CACHE", True)
+HTTP_CIRCUIT_BREAKER_THRESHOLD = int(os.getenv("HTTP_CIRCUIT_BREAKER_THRESHOLD", "5"))
 
 # List of target company ATS slugs for the key-free ATS scraper.
 COMPANIES_FILE = Path(os.getenv("COMPANIES_FILE", str(BASE_DIR / "companies.yaml")))

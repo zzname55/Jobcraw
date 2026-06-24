@@ -4,6 +4,7 @@ import logging
 import random
 import time
 from urllib.parse import urlparse
+from urllib.robotparser import RobotFileParser
 
 import requests
 
@@ -22,18 +23,31 @@ DEFAULT_USER_AGENTS = [
 RETRY_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
+class RobotsDisallowedError(Exception):
+    """Raised when a URL is disallowed by the host's robots.txt."""
+
+
+class CircuitOpenError(Exception):
+    """Raised when a host is in cooling-off after repeated failures."""
+
+
 class HttpClient:
     """Polite, shared HTTP client used by every scraper.
 
-    Responsibilities (Phase 0 of SCRAPER_ROADMAP.md):
-
+    Phase 0:
     - per-host rate limiting with jitter so traffic is paced like a human,
     - retries with exponential backoff on transient errors, honoring ``Retry-After``,
     - a rotating pool of honest User-Agent strings,
     - a reused session / connection pool.
 
-    robots.txt compliance and HTTP caching are intentionally deferred to Phase 3;
-    the hooks live here so they can be added without touching the scrapers.
+    Phase 3 (politeness hardening):
+    - robots.txt compliance (``respect_robots``): per-host rules are fetched and
+      cached; disallowed URLs raise ``RobotsDisallowedError`` instead of being hit.
+    - conditional-request caching (``enable_cache``): ETag / Last-Modified are
+      remembered and re-sent; a ``304 Not Modified`` reuses the cached response.
+    - circuit breaker (``circuit_breaker_threshold``): after that many consecutive
+      failures a host is put in cooling-off and further requests raise
+      ``CircuitOpenError`` for the rest of the run.
     """
 
     def __init__(
@@ -46,6 +60,9 @@ class HttpClient:
         user_agents: list[str] | None = None,
         session: requests.Session | None = None,
         logger: logging.Logger | None = None,
+        respect_robots: bool = False,
+        enable_cache: bool = True,
+        circuit_breaker_threshold: int = 5,
     ) -> None:
         self.rate_limit_seconds = rate_limit_seconds
         self.jitter_seconds = jitter_seconds
@@ -61,18 +78,39 @@ class HttpClient:
             }
         )
         self.logger = logger or logging.getLogger("http_client")
+        self.respect_robots = respect_robots
+        self.enable_cache = enable_cache
+        self.circuit_breaker_threshold = circuit_breaker_threshold
+        self._robots_agent = "job-automation"
         self._last_request_at: dict[str, float] = {}
+        self._robots_cache: dict[str, RobotFileParser | None] = {}
+        self._cache: dict[str, dict] = {}
+        self._failures: dict[str, int] = {}
+        self._circuit_open: set[str] = set()
 
     def get(self, url: str, **kwargs) -> requests.Response:
-        """GET ``url`` with rate limiting and retry/backoff. Returns a 2xx response.
+        """GET ``url`` politely. Returns a 2xx (or cached 304) response.
 
         Keyword arguments are passed through to ``requests`` (``params``, extra
         ``headers``, etc.). A random User-Agent is added unless one is supplied.
+        Raises ``CircuitOpenError`` or ``RobotsDisallowedError`` when the request
+        is refused before it is sent.
         """
         host = self._host(url)
+        if host in self._circuit_open:
+            raise CircuitOpenError(f"circuit open for {host} after repeated failures")
+        if self.respect_robots and not self._robots_allows(url):
+            raise RobotsDisallowedError(f"robots.txt disallows {url}")
+
         timeout = kwargs.pop("timeout", self.timeout)
         headers = dict(kwargs.pop("headers", {}) or {})
         headers.setdefault("User-Agent", random.choice(self.user_agents))
+        cached = self._cache.get(url) if self.enable_cache else None
+        if cached:
+            if cached.get("etag"):
+                headers.setdefault("If-None-Match", cached["etag"])
+            if cached.get("last_modified"):
+                headers.setdefault("If-Modified-Since", cached["last_modified"])
 
         attempt = 0
         while True:
@@ -81,6 +119,7 @@ class HttpClient:
                 response = self.session.get(url, timeout=timeout, headers=headers, **kwargs)
             except requests.RequestException as error:
                 if attempt >= self.max_retries:
+                    self._record_failure(host)
                     raise
                 self.logger.info("retrying %s after error: %s", url, error)
                 self._sleep_backoff(attempt)
@@ -93,12 +132,22 @@ class HttpClient:
                 attempt += 1
                 continue
 
-            response.raise_for_status()
+            if cached is not None and response.status_code == 304:
+                self._record_success(host)
+                return cached["response"]
+            if response.status_code >= 400:
+                self._record_failure(host)
+                response.raise_for_status()
+
+            self._record_success(host)
+            self._store_cache(url, response)
             return response
 
     def respect_rate_limit(self, url: str = "") -> None:
         """Backward-compatible hook kept for existing scrapers."""
         self._respect_rate_limit(self._host(url))
+
+    # -- internals -----------------------------------------------------------
 
     def _host(self, url: str) -> str:
         return urlparse(url).netloc.lower()
@@ -128,3 +177,52 @@ class HttpClient:
         if self.jitter_seconds:
             delay += random.uniform(0, self.jitter_seconds)
         time.sleep(delay)
+
+    # -- circuit breaker -----------------------------------------------------
+
+    def _record_failure(self, host: str) -> None:
+        self._failures[host] = self._failures.get(host, 0) + 1
+        if self.circuit_breaker_threshold and self._failures[host] >= self.circuit_breaker_threshold:
+            self._circuit_open.add(host)
+            self.logger.warning("circuit opened for %s after %d failures", host, self._failures[host])
+
+    def _record_success(self, host: str) -> None:
+        self._failures.pop(host, None)
+        self._circuit_open.discard(host)
+
+    # -- conditional-request caching ----------------------------------------
+
+    def _store_cache(self, url: str, response: requests.Response) -> None:
+        if not self.enable_cache or response.status_code != 200:
+            return
+        etag = response.headers.get("ETag")
+        last_modified = response.headers.get("Last-Modified")
+        if etag or last_modified:
+            self._cache[url] = {"etag": etag, "last_modified": last_modified, "response": response}
+
+    # -- robots.txt ----------------------------------------------------------
+
+    def _robots_allows(self, url: str) -> bool:
+        host = self._host(url)
+        if host not in self._robots_cache:
+            self._robots_cache[host] = self._load_robots(url)
+        parser = self._robots_cache[host]
+        if parser is None:  # could not load robots.txt -> be permissive
+            return True
+        try:
+            return parser.can_fetch(self._robots_agent, url)
+        except Exception:
+            return True
+
+    def _load_robots(self, url: str) -> RobotFileParser | None:
+        parts = urlparse(url)
+        robots_url = f"{parts.scheme}://{parts.netloc}/robots.txt"
+        try:
+            response = self.session.get(robots_url, timeout=self.timeout, headers={"User-Agent": self._robots_agent})
+        except requests.RequestException:
+            return None
+        if response.status_code >= 400:
+            return None
+        parser = RobotFileParser()
+        parser.parse(response.text.splitlines())
+        return parser

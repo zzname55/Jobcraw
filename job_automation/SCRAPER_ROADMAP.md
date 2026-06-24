@@ -133,8 +133,8 @@ crawler do the heavy, repeatable fetching against ATS APIs.
   honoring `Retry-After`, rotating honest UA pool) now backs `BaseScraper.get()`.
 - `SEARCH_BACKEND`, `HTTP_MAX_RETRIES`, `HTTP_JITTER_SECONDS`, and `COMPANIES_FILE` added to config.
 - Note: implemented on `requests` to avoid new install friction; swapping to `httpx`/`tenacity`/
-  `hishel` later is a drop-in because everything goes through one client. robots.txt + HTTP caching
-  hooks are stubbed for Phase 3.
+  `hishel` later is a drop-in because everything goes through one client. (robots.txt + HTTP caching
+  were added in Phase 3.)
 
 **Phase 1 — ATS engine (biggest win)** — ✅ **done (Greenhouse + Lever + Ashby + Workable)**
 - `scrapers/ats_scraper.py` fetches all four ATS public JSON boards, keeps AI/automation-relevant
@@ -156,9 +156,14 @@ crawler do the heavy, repeatable fetching against ATS APIs.
   (`base_scraper.clean_field`) strips upstream-corrupted characters.
 - **TODO:** more startup RSS feeds, sitemap enumeration.
 
-**Phase 3 — politeness hardening** — 🟡 **partly done**
-- Done via the shared HTTP client: per-host limiter + jitter, backoff on 429/503, UA pool.
-- **TODO:** conditional-request/HTTP caching, robots.txt enforcement, circuit breaker.
+**Phase 3 — politeness hardening** — ✅ **done**
+- Shared HTTP client now adds, on top of per-host limiter + jitter + backoff + UA pool:
+  robots.txt enforcement (disallowed URLs raise `RobotsDisallowedError`), conditional-request caching
+  (ETag / Last-Modified → `304` reuse), and a per-host circuit breaker (`CircuitOpenError` after N
+  consecutive failures). Knobs: `HTTP_RESPECT_ROBOTS`, `HTTP_ENABLE_CACHE`, `HTTP_CIRCUIT_BREAKER_THRESHOLD`.
+- Verified all real sources are allowed by their robots.txt; live HN run unaffected. Offline tests in
+  `tests/test_http_client.py`.
+- Future option: persist the HTTP cache across runs (currently in-memory per run).
 
 **Phase 4 — discovery loop**
 - Use a *small* SerpAPI budget to discover new ATS slugs, persist them into `companies.yaml`, then

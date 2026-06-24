@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import pytest
 import requests
 
 from scrapers import http_client
-from scrapers.http_client import HttpClient
+from scrapers.http_client import CircuitOpenError, HttpClient, RobotsDisallowedError
 
 
 class FakeResponse:
-    def __init__(self, status_code: int = 200, headers: dict | None = None) -> None:
+    def __init__(self, status_code: int = 200, headers: dict | None = None, text: str = "") -> None:
         self.status_code = status_code
         self.headers = headers or {}
+        self.text = text
         self.url = "https://example.com"
 
     def raise_for_status(self) -> None:
@@ -91,3 +93,87 @@ def test_retry_after_header_is_honored(monkeypatch):
     client.get("https://example.com/api")
 
     assert any(value >= 7 for value in sleeps)
+
+
+# -- Phase 3: politeness hardening -----------------------------------------
+
+
+class RoutingSession:
+    """Fake session that serves robots.txt and routes other URLs to responses."""
+
+    def __init__(self, routes: dict, robots_text: str | None = None) -> None:
+        self.routes = routes
+        self.robots_text = robots_text
+        self.calls: list[dict] = []
+        self.headers: dict = {}
+
+    def get(self, url: str, **kwargs):
+        self.calls.append({"url": url, **kwargs})
+        if url.endswith("/robots.txt"):
+            return FakeResponse(200, text=self.robots_text) if self.robots_text is not None else FakeResponse(404)
+        result = self.routes.get(url)
+        if result is None:
+            return FakeResponse(404)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+
+def test_robots_txt_blocks_disallowed_path_but_allows_others(monkeypatch):
+    monkeypatch.setattr(http_client.time, "sleep", lambda *_: None)
+    session = RoutingSession(
+        routes={"https://x.com/public": FakeResponse(200)},
+        robots_text="User-agent: *\nDisallow: /private\n",
+    )
+    client = HttpClient(rate_limit_seconds=0, jitter_seconds=0, session=session, respect_robots=True)
+
+    assert client.get("https://x.com/public").status_code == 200
+    with pytest.raises(RobotsDisallowedError):
+        client.get("https://x.com/private/secret")
+
+
+def test_conditional_caching_reuses_response_on_304(monkeypatch):
+    monkeypatch.setattr(http_client.time, "sleep", lambda *_: None)
+    first = FakeResponse(200, headers={"ETag": "abc123"})
+    session = FakeSession([first, FakeResponse(304)])
+    client = HttpClient(rate_limit_seconds=0, jitter_seconds=0, session=session, respect_robots=False, enable_cache=True)
+
+    r1 = client.get("https://api.example.com/data")
+    r2 = client.get("https://api.example.com/data")
+
+    assert r1 is first
+    assert r2 is first  # the cached body is reused on 304 Not Modified
+    assert session.calls[1]["headers"].get("If-None-Match") == "abc123"
+
+
+class AlwaysSession:
+    def __init__(self, response: FakeResponse) -> None:
+        self.response = response
+        self.calls: list[dict] = []
+        self.headers: dict = {}
+
+    def get(self, url: str, **kwargs):
+        self.calls.append({"url": url, **kwargs})
+        return self.response
+
+
+def test_circuit_breaker_opens_after_threshold(monkeypatch):
+    monkeypatch.setattr(http_client.time, "sleep", lambda *_: None)
+    session = AlwaysSession(FakeResponse(500))
+    client = HttpClient(
+        rate_limit_seconds=0,
+        jitter_seconds=0,
+        session=session,
+        respect_robots=False,
+        max_retries=0,
+        circuit_breaker_threshold=2,
+    )
+
+    for _ in range(2):
+        with pytest.raises(requests.HTTPError):
+            client.get("https://flaky.example.com/x")
+
+    calls_before = len(session.calls)
+    with pytest.raises(CircuitOpenError):
+        client.get("https://flaky.example.com/x")  # short-circuits, no network call
+    assert len(session.calls) == calls_before

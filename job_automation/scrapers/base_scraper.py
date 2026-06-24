@@ -6,7 +6,14 @@ from typing import Any
 
 import requests
 
-from config import HTTP_JITTER_SECONDS, HTTP_MAX_RETRIES, SCRAPER_RATE_LIMIT_SECONDS
+from config import (
+    HTTP_CIRCUIT_BREAKER_THRESHOLD,
+    HTTP_ENABLE_CACHE,
+    HTTP_JITTER_SECONDS,
+    HTTP_MAX_RETRIES,
+    HTTP_RESPECT_ROBOTS,
+    SCRAPER_RATE_LIMIT_SECONDS,
+)
 from database.models import Job
 from matching.company_intel import extract_company_size
 from matching.language_detection import detect_language
@@ -51,6 +58,9 @@ class BaseScraper(ABC):
             jitter_seconds=HTTP_JITTER_SECONDS,
             max_retries=HTTP_MAX_RETRIES,
             logger=self.logger,
+            respect_robots=HTTP_RESPECT_ROBOTS,
+            enable_cache=HTTP_ENABLE_CACHE,
+            circuit_breaker_threshold=HTTP_CIRCUIT_BREAKER_THRESHOLD,
         )
         # Backward-compatible alias; some scrapers/tests reference ``session``.
         self.session = self.http.session
