@@ -144,17 +144,23 @@ crawler do the heavy, repeatable fetching against ATS APIs.
   remote detection to use Workable's actual `telecommuting` field.
 - **TODO:** seed `companies.yaml` with your real targets.
 
-**Phase 2 — feeds & sitemaps** — 🟡 **mostly done**
+**Phase 2 — feeds & sitemaps** — ✅ **done (sitemaps deprioritized)**
 - We Work Remotely now uses its public RSS feed (`/remote-jobs.rss`) instead of the 403 HTML search
   (`scrapers/weworkremotely_scraper.py`).
 - Hacker News "Ask HN: Who is hiring?" via the Algolia API (`scrapers/hackernews_scraper.py`,
   `--sources hackernews`): finds the latest monthly thread, parses each top-level comment into a
   company/role/location/remote posting, and keeps only AI/automation-relevant ones. A live review
   yielded ~40 AI-startup postings per month.
+- Generic RSS/Atom scraper (`scrapers/rss_scraper.py`, `--sources rss`): reads a configurable feed
+  list (`RSS_FEEDS`, defaults to Himalayas + WeWorkRemotely categories + Jobspresso). A live review
+  fixed company extraction (explicit `<company>`/`<companyName>`/`<dc:creator>` tag, else "Company: Role"),
+  switched to title-based relevance (full descriptions were too noisy), guarded the German ":in" gender
+  form, and dropped bare "agent" from the AI signals (it matched human "Customer Service Agent" roles).
 - Broad feeds (RemoteOK, Arbeitnow, RSS) run a shared relevance pre-filter (`matching/relevance.py`)
   so the per-source budget is spent on AI/automation roles, and a text sanitizer
   (`base_scraper.clean_field`) strips upstream-corrupted characters.
-- **TODO:** more startup RSS feeds, sitemap enumeration.
+- Sitemap enumeration is intentionally deprioritized: it is brittle and per-site, and the ATS APIs
+  already provide structured per-company job data far more reliably.
 
 **Phase 3 — politeness hardening** — ✅ **done**
 - Shared HTTP client now adds, on top of per-host limiter + jitter + backoff + UA pool:

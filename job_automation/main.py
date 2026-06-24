@@ -22,6 +22,7 @@ from scrapers.berlin_startup_jobs_scraper import BerlinStartupJobsScraper
 from scrapers.arbeitnow_scraper import ArbeitnowScraper
 from scrapers.ats_scraper import AtsScraper
 from scrapers.hackernews_scraper import HackerNewsHiringScraper
+from scrapers.rss_scraper import RssFeedScraper
 from scrapers.generic_search_scraper import GenericSearchScraper
 from scrapers.german_tech_jobs_scraper import GermanTechJobsScraper
 from scrapers.join_scraper import JoinScraper
@@ -47,6 +48,7 @@ SCRAPER_REGISTRY = {
     "generic": GenericSearchScraper,
     "ats": AtsScraper,
     "hackernews": HackerNewsHiringScraper,
+    "rss": RssFeedScraper,
     "mock": MockWebsiteScraper,
     "manual": ManualSourceScraper,
     "join": JoinScraper,

@@ -150,6 +150,7 @@ Default when `--sources` is omitted: `remoteok, remotive, arbeitnow, weworkremot
 | `generic` | **Search API + page fetch** | **Yes (SerpAPI)** | The self-built search scraper. Builds targeted queries, calls SerpAPI, filters noise, optionally fetches each job-detail page for richer text. See `SCRAPER_ROADMAP.md`. |
 | `ats` | **ATS JSON APIs** | No | Key-free scraper for Greenhouse + Lever + Ashby + Workable public job boards. Reads company slugs from `companies.yaml`, keeps AI/automation-relevant titles, maps to `Job`. This is the recommended SerpAPI-free path — see `SCRAPER_ROADMAP.md`. |
 | `hackernews` | **HN Algolia API** | No | Parses the monthly "Ask HN: Who is hiring?" thread (key-free). Extracts company/role/location/remote from each top-level comment; keeps only AI/automation-relevant postings. Rich in AI startups. |
+| `rss` | **RSS/Atom feeds** | No | Generic feed scraper (Himalayas, WeWorkRemotely categories, Jobspresso by default; add more via `RSS_FEEDS`). Extracts the company from a `<company>`/`<companyName>`/`<dc:creator>` tag or a "Company: Role" title; title-based relevance filter. |
 | `mock` | Offline fixtures | No | `scrapers/mock_website_scraper.py` — deterministic jobs for testing the whole pipeline offline. |
 | `manual` | CSV import | No | Reads `manual_jobs.csv` (same columns as the `Job` model). |
 | `yc`, `wellfound`, `join`, `germantechjobs`, `berlinstartupjobs` | **Placeholders** | No | Return `[]` and log a note. They exist as extension points; these boards are JS-heavy or ToS-sensitive and should be reached via approved APIs/feeds, not raw scraping. |
@@ -218,6 +219,7 @@ this schema and calls `BaseScraper.normalize_job()`. Key fields:
 | `HTTP_CIRCUIT_BREAKER_THRESHOLD` | `5` | Consecutive per-host failures before the host is skipped for the run. |
 | `SEARCH_BACKEND` | `auto` | `serpapi` / `crawler` / `auto` (informational today; see roadmap). |
 | `COMPANIES_FILE` | `companies.yaml` | Path to the ATS slug list used by `--sources ats`. |
+| `RSS_FEEDS` | (built-in set) | Comma-separated RSS/Atom feed URLs for the `rss` source. |
 | `SERPAPI_API_KEY` | — | Enables the `generic` SerpAPI search path. |
 | `SERPAPI_FETCH_DETAILS` | `true` | If false, the `generic` scraper skips slow job-detail page fetches. |
 | `SERPAPI_CAPTURE_DIR` | — | If set, dumps each raw SerpAPI response there so parsing can be iterated offline (no extra credits). |
@@ -371,6 +373,7 @@ Run with `pytest` (see the temp/cache note in [section 3](#3-quick-start)). File
 | `test_http_client.py` | Shared HTTP client: success path, retry/backoff, `Retry-After`, UA header, robots.txt enforcement, conditional-request 304 caching, circuit breaker. |
 | `test_ats_scraper.py` | ATS scraper: slug loading, Greenhouse/Lever/Ashby/Workable mapping, title relevance filter, scoring flow. |
 | `test_hackernews_scraper.py` | HN scraper: picks the "Who is hiring" thread, parses postings, filters noise, company/location/role cleanup. |
+| `test_rss_scraper.py` | Generic RSS scraper: company extraction (tag / companyName / "Company: Role"), German-colon guard, agent/ML relevance. |
 | `test_scraper_quality.py` | Relevance pre-filter (AI/tool signals), text sanitizer, RemoteOK/Arbeitnow filtering, WeWorkRemotely RSS parsing. |
 
 Tests import top-level modules (`config`, `database.models`, …), so run them from inside the project

@@ -52,6 +52,10 @@ HTTP_CIRCUIT_BREAKER_THRESHOLD = int(os.getenv("HTTP_CIRCUIT_BREAKER_THRESHOLD",
 # List of target company ATS slugs for the key-free ATS scraper.
 COMPANIES_FILE = Path(os.getenv("COMPANIES_FILE", str(BASE_DIR / "companies.yaml")))
 
+# Extra RSS/Atom job feeds for the generic RSS scraper (comma-separated URLs).
+# Empty means use the scraper's built-in default feed list.
+RSS_FEEDS = [url.strip() for url in os.getenv("RSS_FEEDS", "").split(",") if url.strip()]
+
 # When set, the Generic (SerpAPI) scraper dumps each raw API response to this
 # directory. Lets us capture real responses once and iterate on parsing offline
 # without spending more SerpAPI credits.

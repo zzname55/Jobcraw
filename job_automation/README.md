@@ -83,6 +83,7 @@ Implemented sources:
 - Generic Search via SerpAPI when `SERPAPI_API_KEY` is set
 - ATS boards (Greenhouse + Lever + Ashby + Workable) via `--sources ats`, key-free; list company slugs in `companies.yaml`
 - Hacker News "Ask HN: Who is hiring?" monthly thread via `--sources hackernews`, key-free
+- RSS/Atom job feeds via `--sources rss`, key-free; configurable with `RSS_FEEDS`
 - Manual import via `manual_jobs.csv`
 - Mock source for offline testing via `--sources mock`
 

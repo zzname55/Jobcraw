@@ -5,8 +5,11 @@ from matching.skills import term_in_text
 
 
 # An AI signal: the niche is fundamentally AI-centric, so an AI/LLM/agent term is
-# the strongest relevance marker. Reuses the project's AI vocabulary.
-AI_SIGNALS = list(dict.fromkeys(AI_SKILLS + ["agent", "agents", "agentic", "mcp", "model context protocol"]))
+# the strongest relevance marker. Reuses the project's AI vocabulary. Note: bare
+# "agent"/"agents" are deliberately excluded -- they match human roles like
+# "Customer Service Agent"; genuine AI-agent roles still match via "ai"/"agentic"/
+# the "ai agents" phrase already in AI_SKILLS.
+AI_SIGNALS = list(dict.fromkeys(AI_SKILLS + ["machine learning", "ml", "agentic", "mcp", "model context protocol"]))
 
 # Specific automation-tool signals. Deliberately NOT the generic word "automation"
 # (that floods in DevOps/SRE/industrial roles); only the no-code/workflow-automation
