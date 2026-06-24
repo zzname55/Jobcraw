@@ -59,7 +59,7 @@ def load_companies(path: Path | str) -> dict[str, list[str]]:
         return {}
     data = yaml.safe_load(file_path.read_text(encoding="utf-8")) or {}
     companies: dict[str, list[str]] = {}
-    for provider in ("greenhouse", "lever", "ashby"):
+    for provider in ("greenhouse", "lever", "ashby", "workable"):
         raw = data.get(provider) or []
         companies[provider] = [str(slug).strip() for slug in raw if str(slug).strip()]
     return companies
@@ -68,9 +68,9 @@ def load_companies(path: Path | str) -> dict[str, list[str]]:
 class AtsScraper(BaseScraper):
     """Key-free scraper for public Applicant Tracking System (ATS) job boards.
 
-    Hits the documented public JSON endpoints of Greenhouse, Lever and Ashby,
-    which are meant to be consumed and are not anti-bot protected. Company slugs
-    come from ``companies.yaml`` (see SCRAPER_ROADMAP.md, section 2).
+    Hits the documented public JSON endpoints of Greenhouse, Lever, Ashby and
+    Workable, which are meant to be consumed and are not anti-bot protected.
+    Company slugs come from ``companies.yaml`` (see SCRAPER_ROADMAP.md, section 2).
     """
 
     source_name = "ats"
@@ -86,6 +86,7 @@ class AtsScraper(BaseScraper):
             ("greenhouse", self._fetch_greenhouse),
             ("lever", self._fetch_lever),
             ("ashby", self._fetch_ashby),
+            ("workable", self._fetch_workable),
         )
         if not any(companies.get(name) for name, _ in providers):
             self.logger.info("No ATS company slugs configured in %s. Skipping ATS scraper.", self.companies_file)
@@ -188,6 +189,40 @@ class AtsScraper(BaseScraper):
                 job_url=str(item.get("jobUrl") or item.get("applyUrl") or ""),
                 date_posted=str(item.get("publishedAt") or ""),
                 job_description=description,
+            )
+            jobs.append(self.normalize_job(job))
+            if len(jobs) >= self.limit:
+                break
+        return jobs
+
+    def _fetch_workable(self, slug: str) -> list[Job]:
+        url = f"https://apply.workable.com/api/v1/widget/accounts/{slug}?details=true"
+        try:
+            payload = self.get(url).json()
+        except Exception as error:
+            self.handle_errors(error)
+            return []
+
+        jobs: list[Job] = []
+        for item in payload.get("jobs", []) if isinstance(payload, dict) else []:
+            title = str(item.get("title") or "")
+            if not self._is_relevant_title(title):
+                continue
+            location = " ".join(
+                part for part in [str(item.get("city") or ""), str(item.get("country") or "")] if part
+            ) or str(item.get("location") or "")
+            workplace = str(item.get("workplace_type") or "").lower()
+            remote_type = "remote" if "remote" in workplace else ("hybrid" if "hybrid" in workplace else "unknown")
+            job = Job(
+                job_title=title,
+                company_name=str(payload.get("name") or self._prettify_slug(slug)),
+                location=location,
+                remote_type=remote_type,
+                source_platform=f"workable:{slug}",
+                source_type=self.source_type,
+                job_url=str(item.get("url") or item.get("application_url") or ""),
+                date_posted=str(item.get("published_on") or item.get("created_at") or ""),
+                job_description=self._html_to_text(str(item.get("description") or "")),
             )
             jobs.append(self.normalize_job(job))
             if len(jobs) >= self.limit:

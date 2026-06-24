@@ -148,7 +148,8 @@ Default when `--sources` is omitted: `remoteok, remotive, arbeitnow, weworkremot
 | `arbeitnow` | Public JSON API | No | `GET arbeitnow.com/api/job-board-api` pages 1–3 (Germany/EU focused). |
 | `weworkremotely` | Public RSS feed | No | Parses the `/remote-jobs.rss` feed (the HTML search 403s non-browsers; the feed is published for consumption). Keeps AI/automation-relevant items. |
 | `generic` | **Search API + page fetch** | **Yes (SerpAPI)** | The self-built search scraper. Builds targeted queries, calls SerpAPI, filters noise, optionally fetches each job-detail page for richer text. See `SCRAPER_ROADMAP.md`. |
-| `ats` | **ATS JSON APIs** | No | Key-free scraper for Greenhouse + Lever + Ashby public job boards. Reads company slugs from `companies.yaml`, keeps AI/automation-relevant titles, maps to `Job`. This is the recommended SerpAPI-free path — see `SCRAPER_ROADMAP.md`. |
+| `ats` | **ATS JSON APIs** | No | Key-free scraper for Greenhouse + Lever + Ashby + Workable public job boards. Reads company slugs from `companies.yaml`, keeps AI/automation-relevant titles, maps to `Job`. This is the recommended SerpAPI-free path — see `SCRAPER_ROADMAP.md`. |
+| `hackernews` | **HN Algolia API** | No | Parses the monthly "Ask HN: Who is hiring?" thread (key-free). Extracts company/role/location/remote from each top-level comment; keeps only AI/automation-relevant postings. Rich in AI startups. |
 | `mock` | Offline fixtures | No | `scrapers/mock_website_scraper.py` — deterministic jobs for testing the whole pipeline offline. |
 | `manual` | CSV import | No | Reads `manual_jobs.csv` (same columns as the `Job` model). |
 | `yc`, `wellfound`, `join`, `germantechjobs`, `berlinstartupjobs` | **Placeholders** | No | Return `[]` and log a note. They exist as extension points; these boards are JS-heavy or ToS-sensitive and should be reached via approved APIs/feeds, not raw scraping. |
@@ -365,7 +366,8 @@ Run with `pytest` (see the temp/cache note in [section 3](#3-quick-start)). File
 | `test_word_from_excel.py` | Excel→Word round-trip honors the `Dismissed?` workflow. |
 | `test_generic_search_queries.py` | Query coverage / region term handling. |
 | `test_http_client.py` | Shared HTTP client: success path, retry/backoff, `Retry-After`, UA header. |
-| `test_ats_scraper.py` | ATS scraper: slug loading, Greenhouse/Lever/Ashby mapping, title relevance filter, scoring flow. |
+| `test_ats_scraper.py` | ATS scraper: slug loading, Greenhouse/Lever/Ashby/Workable mapping, title relevance filter, scoring flow. |
+| `test_hackernews_scraper.py` | HN scraper: picks the "Who is hiring" thread, parses postings, filters noise, company/location/role cleanup. |
 | `test_scraper_quality.py` | Relevance pre-filter (AI/tool signals), text sanitizer, RemoteOK/Arbeitnow filtering, WeWorkRemotely RSS parsing. |
 
 Tests import top-level modules (`config`, `database.models`, …), so run them from inside the project

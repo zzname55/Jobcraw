@@ -23,3 +23,7 @@ lever:
 ashby:
   # - your-ashby-slug
   # - another-startup
+
+workable:
+  # - your-workable-slug
+  # - another-startup

@@ -136,19 +136,23 @@ crawler do the heavy, repeatable fetching against ATS APIs.
   `hishel` later is a drop-in because everything goes through one client. robots.txt + HTTP caching
   hooks are stubbed for Phase 3.
 
-**Phase 1 — ATS engine (biggest win)** — ✅ **Greenhouse + Lever + Ashby done; Workable next**
-- `scrapers/ats_scraper.py` fetches Greenhouse + Lever + Ashby public JSON, keeps AI/automation-relevant
+**Phase 1 — ATS engine (biggest win)** — ✅ **done (Greenhouse + Lever + Ashby + Workable)**
+- `scrapers/ats_scraper.py` fetches all four ATS public JSON boards, keeps AI/automation-relevant
   titles, maps to `Job`, and runs the normal enrichment. Slugs come from `companies.yaml`.
 - Registered as `--sources ats`. Offline fixture tests in `tests/test_ats_scraper.py`.
-- **TODO:** add the Workable provider; seed `companies.yaml` with your real targets.
+- **TODO:** seed `companies.yaml` with your real targets.
 
-**Phase 2 — feeds & sitemaps** — 🟡 **started**
+**Phase 2 — feeds & sitemaps** — 🟡 **mostly done**
 - We Work Remotely now uses its public RSS feed (`/remote-jobs.rss`) instead of the 403 HTML search
   (`scrapers/weworkremotely_scraper.py`).
-- Broad feeds (RemoteOK, Arbeitnow, RSS) now run a shared relevance pre-filter (`matching/relevance.py`)
+- Hacker News "Ask HN: Who is hiring?" via the Algolia API (`scrapers/hackernews_scraper.py`,
+  `--sources hackernews`): finds the latest monthly thread, parses each top-level comment into a
+  company/role/location/remote posting, and keeps only AI/automation-relevant ones. A live review
+  yielded ~40 AI-startup postings per month.
+- Broad feeds (RemoteOK, Arbeitnow, RSS) run a shared relevance pre-filter (`matching/relevance.py`)
   so the per-source budget is spent on AI/automation roles, and a text sanitizer
   (`base_scraper.clean_field`) strips upstream-corrupted characters.
-- **TODO:** Hacker News "Who is hiring" (Algolia API), more startup RSS feeds, sitemap enumeration.
+- **TODO:** more startup RSS feeds, sitemap enumeration.
 
 **Phase 3 — politeness hardening** — 🟡 **partly done**
 - Done via the shared HTTP client: per-host limiter + jitter, backoff on 429/503, UA pool.

@@ -81,7 +81,8 @@ Implemented sources:
 - Arbeitnow via public API
 - We Work Remotely via public RSS feed
 - Generic Search via SerpAPI when `SERPAPI_API_KEY` is set
-- ATS boards (Greenhouse + Lever + Ashby) via `--sources ats`, key-free; list company slugs in `companies.yaml`
+- ATS boards (Greenhouse + Lever + Ashby + Workable) via `--sources ats`, key-free; list company slugs in `companies.yaml`
+- Hacker News "Ask HN: Who is hiring?" monthly thread via `--sources hackernews`, key-free
 - Manual import via `manual_jobs.csv`
 - Mock source for offline testing via `--sources mock`
 
