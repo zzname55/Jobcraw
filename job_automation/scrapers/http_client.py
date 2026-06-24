@@ -97,9 +97,13 @@ class HttpClient:
         is refused before it is sent.
         """
         host = self._host(url)
+        bypass_robots = kwargs.pop("bypass_robots", False)
         if host in self._circuit_open:
             raise CircuitOpenError(f"circuit open for {host} after repeated failures")
-        if self.respect_robots and not self._robots_allows(url):
+        # robots.txt governs crawling, not documented/authenticated API endpoints
+        # (e.g. SerpAPI disallows /search.json for crawlers). Callers hitting such
+        # an API pass bypass_robots=True; HTML page crawling still respects robots.
+        if self.respect_robots and not bypass_robots and not self._robots_allows(url):
             raise RobotsDisallowedError(f"robots.txt disallows {url}")
 
         timeout = kwargs.pop("timeout", self.timeout)

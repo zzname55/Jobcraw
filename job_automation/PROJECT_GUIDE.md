@@ -148,6 +148,7 @@ Default when `--sources` is omitted: `remoteok, remotive, arbeitnow, weworkremot
 | `arbeitnow` | Public JSON API | No | `GET arbeitnow.com/api/job-board-api` pages 1–3 (Germany/EU focused). |
 | `weworkremotely` | Public RSS feed | No | Parses the `/remote-jobs.rss` feed (the HTML search 403s non-browsers; the feed is published for consumption). Keeps AI/automation-relevant items. |
 | `generic` | **Search API + page fetch** | **Yes (SerpAPI)** | The self-built search scraper. Builds targeted queries, calls SerpAPI, filters noise, optionally fetches each job-detail page for richer text. See `SCRAPER_ROADMAP.md`. |
+| `cached` | **Replays SerpAPI captures** | No | Re-parses previously captured SerpAPI responses (`SERPAPI_CAPTURE_DIR`) into jobs offline — keeps the value of past paid searches without spending new credits. |
 | `ats` | **ATS JSON APIs** | No | Key-free scraper for Greenhouse + Lever + Ashby + Workable public job boards. Reads company slugs from `companies.yaml`, keeps AI/automation-relevant titles, maps to `Job`. This is the recommended SerpAPI-free path — see `SCRAPER_ROADMAP.md`. |
 | `hackernews` | **HN Algolia API** | No | Parses the monthly "Ask HN: Who is hiring?" thread (key-free). Extracts company/role/location/remote from each top-level comment; keeps only AI/automation-relevant postings. Rich in AI startups. |
 | `rss` | **RSS/Atom feeds** | No | Generic feed scraper (Himalayas, WeWorkRemotely categories, Jobspresso by default; add more via `RSS_FEEDS`). Extracts the company from a `<company>`/`<companyName>`/`<dc:creator>` tag or a "Company: Role" title; title-based relevance filter. |
@@ -379,6 +380,7 @@ Run with `pytest` (see the temp/cache note in [section 3](#3-quick-start)). File
 | `test_rss_scraper.py` | Generic RSS scraper: company extraction (tag / companyName / "Company: Role"), German-colon guard, agent/ML relevance. |
 | `test_discover.py` | ATS discovery: slug extraction per provider, invalid-slug rejection, aggregation, companies.yaml merge. |
 | `test_render.py` | Opt-in Playwright JS rendering: disabled raises, enabled returns rendered HTML (mocked). |
+| `test_cached_scraper.py` | Cached source replays captured SerpAPI responses offline; rejects aggregator noise. |
 | `test_scraper_quality.py` | Relevance pre-filter (AI/tool signals), text sanitizer, RemoteOK/Arbeitnow filtering, WeWorkRemotely RSS parsing. |
 
 Tests import top-level modules (`config`, `database.models`, …), so run them from inside the project
@@ -414,8 +416,9 @@ folder. Network is never required — API sources are not hit in tests; the sear
 - **Feeds over blocked HTML** — We Work Remotely is read via its RSS feed instead of the 403 search page.
 - **Polite by construction** — the shared HTTP client honors robots.txt, sends conditional requests
   (ETag/Last-Modified → 304 reuse), and trips a per-host circuit breaker after repeated failures, on
-  top of per-host rate limiting, jittered backoff, and a rotating User-Agent pool. All of the project's
-  real sources are allowed by their robots.txt.
+  top of per-host rate limiting, jittered backoff, and a rotating User-Agent pool. robots.txt governs
+  crawling, not documented/authenticated APIs, so API calls pass `bypass_robots=True` (e.g. SerpAPI's
+  robots disallows `/search.json` for crawlers); HTML page crawling still respects robots.
 
 ---
 

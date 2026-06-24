@@ -132,6 +132,20 @@ def test_robots_txt_blocks_disallowed_path_but_allows_others(monkeypatch):
         client.get("https://x.com/private/secret")
 
 
+def test_bypass_robots_allows_disallowed_api_url(monkeypatch):
+    monkeypatch.setattr(http_client.time, "sleep", lambda *_: None)
+    session = RoutingSession(
+        routes={"https://api.example.com/search.json": FakeResponse(200)},
+        robots_text="User-agent: *\nDisallow: /search.json\n",
+    )
+    client = HttpClient(rate_limit_seconds=0, jitter_seconds=0, session=session, respect_robots=True)
+
+    # Without bypass this path is disallowed; with bypass (a documented API) it goes through.
+    with pytest.raises(RobotsDisallowedError):
+        client.get("https://api.example.com/search.json")
+    assert client.get("https://api.example.com/search.json", bypass_robots=True).status_code == 200
+
+
 def test_conditional_caching_reuses_response_on_304(monkeypatch):
     monkeypatch.setattr(http_client.time, "sleep", lambda *_: None)
     first = FakeResponse(200, headers={"ETag": "abc123"})

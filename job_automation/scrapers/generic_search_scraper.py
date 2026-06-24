@@ -18,6 +18,7 @@ from scrapers.base_scraper import BaseScraper
 class GenericSearchScraper(BaseScraper):
     source_name = "generic_search"
     source_type = "search_api"
+    fetch_details = SERPAPI_FETCH_DETAILS
     blocked_domains = {
         "linkedin.com",
         "x.com",
@@ -222,6 +223,7 @@ class GenericSearchScraper(BaseScraper):
                 response = self.get(
                     "https://serpapi.com/search.json",
                     params={"engine": "google", "q": query, "api_key": SERPAPI_API_KEY},
+                    bypass_robots=True,
                 )
                 data = response.json()
             except Exception as error:
@@ -259,7 +261,7 @@ class GenericSearchScraper(BaseScraper):
             title = self._clean_title(title)
             description = snippet
             page_title = ""
-            if SERPAPI_FETCH_DETAILS and detail_fetches < max_detail_fetches:
+            if self.fetch_details and detail_fetches < max_detail_fetches:
                 page_title, page_text = self._fetch_job_detail_text(link)
                 detail_fetches += 1
                 if page_title and not self._is_noisy_result(page_title, link):
@@ -412,3 +414,38 @@ class GenericSearchScraper(BaseScraper):
                 return match.group(1).strip().title()
         quoted_terms = re.findall(r'"([^"]+)"', query)
         return quoted_terms[-1] if quoted_terms else "Unknown"
+
+
+class CachedSearchScraper(GenericSearchScraper):
+    """Re-parse previously captured SerpAPI responses -- no API call, no credits.
+
+    When SerpAPI runs are captured (``SERPAPI_CAPTURE_DIR``), this source turns
+    that already-paid-for data into Jobs offline, so the free pipeline keeps the
+    value of past searches without spending more credits. Detail-page fetching is
+    off by design (fully offline).
+    """
+
+    source_name = "cached_search"
+    source_type = "cached"
+    fetch_details = False
+
+    def search(self, region: str = "worldwide", remote: bool = True) -> list[Job]:
+        if not SERPAPI_CAPTURE_DIR:
+            self.logger.info("No SERPAPI_CAPTURE_DIR set; nothing to replay.")
+            return []
+        capture_dir = Path(SERPAPI_CAPTURE_DIR)
+        if not capture_dir.exists():
+            return []
+        jobs: list[Job] = []
+        for path in sorted(capture_dir.glob("*.json")):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except Exception as error:
+                self.handle_errors(error)
+                continue
+            data = payload.get("data", payload)
+            query = payload.get("query", "")
+            jobs.extend(self._parse_serpapi_results(data, query))
+            if len(jobs) >= self.limit:
+                break
+        return jobs[: self.limit]
