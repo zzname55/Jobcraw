@@ -82,6 +82,7 @@ Implemented sources:
 - We Work Remotely via public RSS feed
 - Generic Search via SerpAPI when `SERPAPI_API_KEY` is set
 - DuckDuckGo free web search via `--sources duckduckgo`, key-free — the closest free stand-in for SerpAPI's reach (needs `pip install ddgs`)
+- Brave Search via `--sources brave` — second free web-search backend (~2000 queries/month free); set `BRAVE_SEARCH_API_KEY`, otherwise a no-op. Run `duckduckgo,brave` for resilience against DuckDuckGo rate-limits
 - ATS boards (Greenhouse + Lever + Ashby + Workable) via `--sources ats`, key-free; list company slugs in `companies.yaml`
 - Hacker News "Ask HN: Who is hiring?" monthly thread via `--sources hackernews`, key-free
 - RSS/Atom job feeds via `--sources rss`, key-free; configurable with `RSS_FEEDS`

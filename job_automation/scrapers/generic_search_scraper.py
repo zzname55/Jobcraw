@@ -550,3 +550,63 @@ class DuckDuckGoSearchScraper(GenericSearchScraper):
     def _pace(self) -> None:
         if self.rate_limit_seconds > 0:
             time.sleep(self.rate_limit_seconds + random.uniform(0, 0.5))
+
+
+class BraveSearchScraper(GenericSearchScraper):
+    """Free-tier Brave Search backend (~2000 queries/month, needs an API key).
+
+    A second free web-search backend so the pipeline does not depend on a single
+    provider: DuckDuckGo is unauthenticated but rate-limits aggressive use, while
+    Brave's free tier is steady but key-gated. Running both (``duckduckgo,brave``)
+    gives resilience. Without ``BRAVE_SEARCH_API_KEY`` this source is a harmless
+    no-op. Reuses all of the generic scraper's parsing/filtering.
+    """
+
+    source_name = "brave_search"
+    source_type = "search_free"
+    fetch_details = False
+    results_per_query = 12
+    endpoint = "https://api.search.brave.com/res/v1/web/search"
+
+    def search(self, region: str = "worldwide", remote: bool = True) -> list[Job]:
+        import config
+
+        api_key = config.BRAVE_SEARCH_API_KEY
+        if not api_key:
+            self.logger.info("No BRAVE_SEARCH_API_KEY set; skipping Brave search.")
+            return []
+
+        jobs: list[Job] = []
+        headers = {"X-Subscription-Token": api_key, "Accept": "application/json"}
+        for index, query in enumerate(self.build_queries(region, remote)):
+            try:
+                # Brave is a documented API; robots.txt governs crawling, not this.
+                response = self.get(
+                    self.endpoint,
+                    params={"q": query, "count": self.results_per_query},
+                    headers=headers,
+                    bypass_robots=True,
+                )
+                payload = response.json()
+            except Exception as error:
+                self.handle_errors(error)
+                self._pace()
+                continue
+            data = {"organic_results": self._brave_to_organic(payload)}
+            self._capture_response(index, query, data)
+            jobs.extend(self._parse_serpapi_results(data, query))
+            self._pace()
+        return jobs
+
+    @staticmethod
+    def _brave_to_organic(payload: dict[str, Any]) -> list[dict[str, str]]:
+        results = (payload.get("web") or {}).get("results") or []
+        return [
+            {"title": item.get("title", ""), "link": item.get("url", ""), "snippet": item.get("description", "")}
+            for item in results
+            if isinstance(item, dict)
+        ]
+
+    def _pace(self) -> None:
+        if self.rate_limit_seconds > 0:
+            time.sleep(self.rate_limit_seconds + random.uniform(0, 0.5))

@@ -34,6 +34,9 @@ MAX_COMPANY_EMPLOYEES = int(os.getenv("MAX_COMPANY_EMPLOYEES", "200"))
 SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY", "")
 BING_SEARCH_API_KEY = os.getenv("BING_SEARCH_API_KEY", "")
 GOOGLE_SEARCH_API_KEY = os.getenv("GOOGLE_SEARCH_API_KEY", "")
+# Brave Search API (free tier ~2000 queries/month). Used as a key-free-tier
+# fallback/complement to DuckDuckGo for resilience against DDG rate-limiting.
+BRAVE_SEARCH_API_KEY = os.getenv("BRAVE_SEARCH_API_KEY", "")
 
 # Search backend selection (see SCRAPER_ROADMAP.md). "serpapi" uses the paid
 # SerpAPI source, "crawler" uses the key-free sources (ATS APIs / feeds), and
@@ -49,7 +52,7 @@ DEFAULT_SOURCES = [
     source.strip()
     for source in os.getenv(
         "DEFAULT_SOURCES",
-        "duckduckgo,join,workingnomads,remoteok,remotive,arbeitnow,weworkremotely,ats,hackernews,rss",
+        "duckduckgo,brave,join,workingnomads,remoteok,remotive,arbeitnow,weworkremotely,ats,hackernews,rss",
     ).split(",")
     if source.strip()
 ]

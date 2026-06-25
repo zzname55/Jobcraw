@@ -23,7 +23,7 @@ from scrapers.arbeitnow_scraper import ArbeitnowScraper
 from scrapers.ats_scraper import AtsScraper
 from scrapers.hackernews_scraper import HackerNewsHiringScraper
 from scrapers.rss_scraper import RssFeedScraper
-from scrapers.generic_search_scraper import CachedSearchScraper, DuckDuckGoSearchScraper, GenericSearchScraper
+from scrapers.generic_search_scraper import BraveSearchScraper, CachedSearchScraper, DuckDuckGoSearchScraper, GenericSearchScraper
 from scrapers.german_tech_jobs_scraper import GermanTechJobsScraper
 from scrapers.join_scraper import JoinScraper
 from scrapers.manual_source_scraper import ManualSourceScraper
@@ -49,6 +49,7 @@ SCRAPER_REGISTRY = {
     "generic": GenericSearchScraper,
     "cached": CachedSearchScraper,
     "duckduckgo": DuckDuckGoSearchScraper,
+    "brave": BraveSearchScraper,
     "ats": AtsScraper,
     "hackernews": HackerNewsHiringScraper,
     "rss": RssFeedScraper,

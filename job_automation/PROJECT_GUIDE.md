@@ -139,8 +139,9 @@ runs before storage so over-200-employee companies are never persisted or shown.
 ## 5. Sources: APIs, scrapers, and placeholders
 
 Sources are registered in `SCRAPER_REGISTRY` in [`main.py`](main.py) and selected with `--sources`.
-Default when `--sources` is omitted (the **free stack — no SerpAPI**): `duckduckgo, join, workingnomads,
-remoteok, remotive, arbeitnow, weworkremotely, ats, hackernews, rss`. A head-to-head comparison showed
+Default when `--sources` is omitted (the **free stack — no SerpAPI**): `duckduckgo, brave, join,
+workingnomads, remoteok, remotive, arbeitnow, weworkremotely, ats, hackernews, rss` (`brave` is a no-op
+without `BRAVE_SEARCH_API_KEY`). A head-to-head comparison showed
 this free stack matching/beating the paid SerpAPI source, so SerpAPI (`generic`) is no longer a default —
 its credits are reserved for the occasional ATS discovery run (`discover_ats_companies.py`, capped at 5
 searches). Override the default with the `DEFAULT_SOURCES` env var.
@@ -153,6 +154,7 @@ searches). Override the default with the `DEFAULT_SOURCES` env var.
 | `weworkremotely` | Public RSS feed | No | Parses the `/remote-jobs.rss` feed (the HTML search 403s non-browsers; the feed is published for consumption). Keeps AI/automation-relevant items. |
 | `generic` | **Search API + page fetch** | **Yes (SerpAPI)** | The self-built search scraper. Builds targeted queries, calls SerpAPI, filters noise, optionally fetches each job-detail page for richer text. See `SCRAPER_ROADMAP.md`. |
 | `duckduckgo` | **Free web search** | No | Same targeted queries as `generic`, but against DuckDuckGo via the key-free `ddgs` library — the closest free stand-in for SerpAPI's "search the whole web" strategy. Reuses all of `generic`'s noise filtering and company extraction; snippets only (no detail fetch), paced and capped by `--limit`. This is the recommended SerpAPI-free way to match SerpAPI's reach. |
+| `brave` | **Free web search** | Free-tier key | Brave Search API (~2000 queries/month free). A second web-search backend so the pipeline doesn't depend on DuckDuckGo alone (DDG rate-limits aggressive use). Same queries/parsing as `duckduckgo`; set `BRAVE_SEARCH_API_KEY` to enable, otherwise a no-op. Run `duckduckgo,brave` together for resilience. |
 | `cached` | **Replays SerpAPI captures** | No | Re-parses previously captured SerpAPI responses (`SERPAPI_CAPTURE_DIR`) into jobs offline — keeps the value of past paid searches without spending new credits. |
 | `ats` | **ATS JSON APIs** | No | Key-free scraper for Greenhouse + Lever + Ashby + Workable public job boards. Reads company slugs from `companies.yaml`, keeps AI/automation-relevant titles, maps to `Job`. This is the recommended SerpAPI-free path — see `SCRAPER_ROADMAP.md`. |
 | `hackernews` | **HN Algolia API** | No | Parses the monthly "Ask HN: Who is hiring?" thread (key-free). Extracts company/role/location/remote from each top-level comment; keeps only AI/automation-relevant postings. Rich in AI startups. |
