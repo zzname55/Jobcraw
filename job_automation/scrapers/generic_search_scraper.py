@@ -72,19 +72,27 @@ class GenericSearchScraper(BaseScraper):
         "google.com",
         "duckduckgo.com",
         "yahoo.com",
-        # India/Pakistan job boards: low-cost-region listings the user bans
-        # outright (pay in PKR/INR). Dropped entirely, not just renamed.
-        "mustakbil.com",
-        "rozee.pk",
-        "naukri.com",
-        "shine.com",
-        "timesjobs.com",
+        # Low-wage-region job boards (India, Pakistan, Bangladesh, Philippines,
+        # Vietnam, Nigeria, Kenya, Egypt, ...): listings the user bans outright
+        # (pay in PKR/INR/BDT/...). Dropped entirely, not just renamed.
+        "mustakbil.com",   # Pakistan
+        "rozee.pk",        # Pakistan
+        "naukri.com",      # India
+        "shine.com",       # India
+        "timesjobs.com",   # India
         "indeed.pk",
         "indeed.in",
-        "foundit.in",
+        "foundit.in",      # India (ex-Monster)
         "monsterindia.com",
-        "hirist.com",
-        "instahyre.com",
+        "hirist.com",      # India
+        "instahyre.com",   # India
+        "bdjobs.com",      # Bangladesh
+        "kalibrr.com",     # Philippines
+        "vietnamworks.com",  # Vietnam
+        "topcv.vn",        # Vietnam
+        "jobberman.com",   # Nigeria
+        "brightermonday.com",  # Kenya
+        "wuzzuf.net",      # Egypt
     }
     weak_aggregator_domains = {
         "indeed.com",
@@ -124,7 +132,6 @@ class GenericSearchScraper(BaseScraper):
         "social-networking.me",
         "railway.app",
         "page.gd",
-        "wuzzuf.net",
         "simplyhired.com",
         "euremotejobs.com",
         "cvbankas.lt",
