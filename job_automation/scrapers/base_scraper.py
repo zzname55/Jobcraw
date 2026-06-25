@@ -17,6 +17,7 @@ from config import (
 )
 from database.models import Job
 from matching.company_intel import extract_company_size, lookup_company_size
+from usage import tracker
 from matching.language_detection import detect_language
 from matching.region_detection import detect_location_details
 from matching.remote_detection import detect_remote_type
@@ -49,6 +50,10 @@ class BaseScraper(ABC):
     source_name = "base"
     base_url = ""
     source_type = "scraper"
+    # Count each HTTP request under ``source_name`` for the monthly usage report.
+    # Search backends set this False because they meter their billed queries
+    # explicitly (a SerpAPI credit is one search.json call, not every page fetch).
+    track_http_usage = True
 
     def __init__(self, limit: int = 50, rate_limit_seconds: float = SCRAPER_RATE_LIMIT_SECONDS) -> None:
         self.limit = limit
@@ -112,4 +117,7 @@ class BaseScraper(ABC):
         self.logger.warning("%s skipped after error: %s", self.source_name, error)
 
     def get(self, url: str, **kwargs: Any) -> requests.Response:
-        return self.http.get(url, **kwargs)
+        response = self.http.get(url, **kwargs)
+        if self.track_http_usage:
+            tracker.record(self.source_name)
+        return response

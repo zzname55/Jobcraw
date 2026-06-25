@@ -34,6 +34,7 @@ from scrapers.weworkremotely_scraper import WeWorkRemotelyScraper
 from scrapers.workingnomads_scraper import WorkingNomadsScraper
 from scrapers.wellfound_scraper import WellfoundScraper
 from scrapers.yc_jobs_scraper import YCJobsScraper
+from usage import tracker
 
 
 app = typer.Typer(help="Junior AI Automation job scraper and matcher.")
@@ -103,6 +104,32 @@ def score_jobs(jobs: list[Job]) -> list[Job]:
         job.reason_for_score = explain_score(job)
         scored_jobs.append(job)
     return scored_jobs
+
+
+def print_usage_report() -> None:
+    rows = tracker.report_rows()
+    if not rows:
+        return
+    table = Table(title=f"API / source usage ({tracker.month})")
+    table.add_column("Provider")
+    table.add_column("Used", justify="right")
+    table.add_column("Monthly limit", justify="right")
+    table.add_column("Remaining", justify="right")
+    table.add_column("%", justify="right")
+    table.add_column("Status")
+    for row in rows:
+        limit = row["limit"]
+        status = "[red]BLOCKED (>=95%)[/]" if row["blocked"] else ("[yellow]near limit[/]" if (row["percent"] or 0) >= 80 else "ok")
+        table.add_row(
+            row["provider"],
+            str(row["used"]),
+            "unlimited" if limit is None else str(limit),
+            "-" if row["remaining"] is None else str(row["remaining"]),
+            "-" if row["percent"] is None else f"{row['percent']}%",
+            status if limit is not None else "free",
+        )
+    console.print(table)
+    tracker.save()
 
 
 def print_top_jobs(jobs: list[Job], count: int = 5) -> None:
@@ -195,6 +222,7 @@ def run(
     if docx_path:
         console.print(f"Word report saved to {docx_path}")
     print_top_jobs(exportable_jobs)
+    print_usage_report()
 
     if parse_bool(dashboard):
         console.print("Start dashboard with: streamlit run dashboard/app.py")

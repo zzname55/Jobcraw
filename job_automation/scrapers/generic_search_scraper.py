@@ -17,12 +17,17 @@ from matching.targeting import get_list, get_region_terms
 from matching.region_detection import GEOGRAPHIC_NAMES, is_location_name
 from scrapers.base_scraper import BaseScraper
 from scrapers.jsonld import extract_job_posting, job_posting_fields
+from usage import tracker
 
 
 class GenericSearchScraper(BaseScraper):
     source_name = "generic_search"
     source_type = "search_api"
     fetch_details = SERPAPI_FETCH_DETAILS
+    # Meter billed search queries explicitly under this provider key, not every
+    # HTTP request (detail-page fetches are free and must not count as credits).
+    track_http_usage = False
+    usage_provider = "serpapi"
     blocked_domains = {
         "linkedin.com",
         "x.com",
@@ -245,6 +250,12 @@ class GenericSearchScraper(BaseScraper):
         # For Generic Search, ``limit`` intentionally controls the number of
         # SerpAPI queries so test runs can cap API-credit usage predictably.
         for index, query in enumerate(self.build_queries(region, remote)):
+            if not tracker.allow(self.usage_provider):
+                self.logger.warning(
+                    "%s monthly quota guard reached (>=95%% of limit); stopping to avoid overage.",
+                    self.usage_provider,
+                )
+                break
             try:
                 response = self.get(
                     "https://serpapi.com/search.json",
@@ -255,6 +266,7 @@ class GenericSearchScraper(BaseScraper):
             except Exception as error:
                 self.handle_errors(error)
                 continue
+            tracker.record(self.usage_provider)  # a successful billed search
             self._capture_response(index, query, data)
             jobs.extend(self._parse_serpapi_results(data, query))
         return jobs
@@ -518,6 +530,8 @@ class DuckDuckGoSearchScraper(GenericSearchScraper):
     source_name = "duckduckgo_search"
     source_type = "search_free"
     fetch_details = False
+    track_http_usage = False
+    usage_provider = "duckduckgo"
     results_per_query = 12
 
     def search(self, region: str = "worldwide", remote: bool = True) -> list[Job]:
@@ -530,12 +544,16 @@ class DuckDuckGoSearchScraper(GenericSearchScraper):
         jobs: list[Job] = []
         with DDGS() as ddgs:
             for index, query in enumerate(self.build_queries(region, remote)):
+                if not tracker.allow(self.usage_provider):
+                    self.logger.warning("%s monthly quota guard reached (>=95%%); stopping.", self.usage_provider)
+                    break
                 try:
                     raw_results = list(ddgs.text(query, max_results=self.results_per_query))
                 except Exception as error:
                     self.handle_errors(error)
                     self._pace()
                     continue
+                tracker.record(self.usage_provider)
                 data = {
                     "organic_results": [
                         {"title": item.get("title", ""), "link": item.get("href", ""), "snippet": item.get("body", "")}
@@ -565,6 +583,8 @@ class BraveSearchScraper(GenericSearchScraper):
     source_name = "brave_search"
     source_type = "search_free"
     fetch_details = False
+    track_http_usage = False
+    usage_provider = "brave"
     results_per_query = 12
     endpoint = "https://api.search.brave.com/res/v1/web/search"
 
@@ -579,6 +599,9 @@ class BraveSearchScraper(GenericSearchScraper):
         jobs: list[Job] = []
         headers = {"X-Subscription-Token": api_key, "Accept": "application/json"}
         for index, query in enumerate(self.build_queries(region, remote)):
+            if not tracker.allow(self.usage_provider):
+                self.logger.warning("%s monthly quota guard reached (>=95%%); stopping.", self.usage_provider)
+                break
             try:
                 # Brave is a documented API; robots.txt governs crawling, not this.
                 response = self.get(
@@ -592,6 +615,7 @@ class BraveSearchScraper(GenericSearchScraper):
                 self.handle_errors(error)
                 self._pace()
                 continue
+            tracker.record(self.usage_provider)  # a successful Brave API query
             data = {"organic_results": self._brave_to_organic(payload)}
             self._capture_response(index, query, data)
             jobs.extend(self._parse_serpapi_results(data, query))

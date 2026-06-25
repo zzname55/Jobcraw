@@ -13,6 +13,7 @@ from rich.console import Console
 
 from config import COMPANIES_FILE, SERPAPI_API_KEY, SERPAPI_CAPTURE_DIR
 from scrapers.ats_scraper import load_companies
+from usage import tracker
 
 
 app = typer.Typer(help="Discover ATS company slugs via SerpAPI and merge them into companies.yaml.")
@@ -156,15 +157,20 @@ def main(
     console.print(f"Running {len(queries)} discovery queries (of {len(build_queries())} possible)...")
     all_found: dict[str, set[str]] = {provider: set() for provider in ATS_SITES}
     for index, query in enumerate(queries, start=1):
+        if not tracker.allow("serpapi"):
+            console.print("[yellow]SerpAPI monthly quota guard reached (>=95%); stopping discovery.[/]")
+            break
         try:
             results = _serpapi_search(query)
         except Exception as error:  # noqa: BLE001
             console.print(f"[yellow]query {index} failed:[/] {error}")
             continue
+        tracker.record("serpapi")  # count the same monthly SerpAPI budget as the scraper
         for provider, slugs in extract_slugs(results).items():
             all_found[provider] |= slugs
         console.print(f"  [{index}/{len(queries)}] {query} -> {sum(len(s) for s in extract_slugs(results).values())} slugs")
         time.sleep(1)
+    tracker.save()
 
     added = merge_into_companies(output or COMPANIES_FILE, all_found)
     total_added = sum(len(v) for v in added.values())

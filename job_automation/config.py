@@ -97,6 +97,18 @@ SERPAPI_CAPTURE_DIR = os.getenv("SERPAPI_CAPTURE_DIR", "")
 # fast capture runs or when only SerpAPI snippets are needed.
 SERPAPI_FETCH_DETAILS = env_bool("SERPAPI_FETCH_DETAILS", True)
 
+# Monthly usage counter + quota guard (see usage.py). Each metered provider has a
+# monthly allowance; the tracker blocks further calls at USAGE_BLOCK_RATIO (95%) so
+# a paid quota (SerpAPI) or free tier (Brave) is never exceeded. Free/unlimited
+# sources are counted for visibility with no limit. All values env-overridable.
+USAGE_FILE = os.getenv("USAGE_FILE", str(DATA_DIR / "usage.json"))
+USAGE_BLOCK_RATIO = float(os.getenv("USAGE_BLOCK_RATIO", "0.95"))
+USAGE_LIMITS = {
+    "serpapi": int(os.getenv("SERPAPI_MONTHLY_LIMIT", "100")),
+    "brave": int(os.getenv("BRAVE_MONTHLY_LIMIT", "2000")),
+    "duckduckgo": int(os.getenv("DUCKDUCKGO_MONTHLY_LIMIT", "2000")),
+}
+
 GOOGLE_SHEETS_ENABLED = env_bool("GOOGLE_SHEETS_ENABLED", False)
 GOOGLE_SHEETS_CREDENTIALS_PATH = os.getenv("GOOGLE_SHEETS_CREDENTIALS_PATH", "")
 GOOGLE_SHEETS_ID = os.getenv("GOOGLE_SHEETS_ID", "")

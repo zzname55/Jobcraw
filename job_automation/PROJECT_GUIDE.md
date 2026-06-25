@@ -223,6 +223,15 @@ this schema and calls `BaseScraper.normalize_job()`. Key fields:
 (`TARGETING_FILE`). Edit them to retarget to different roles/regions; delete a key (or the whole file) to
 fall back to the built-in defaults. No Python changes needed.
 
+**Usage tracking & quota guard (`usage.py`).** Every metered provider is counted per calendar month in
+`data/usage.json` (`USAGE_FILE`) and **blocked at 95% of its limit** (`USAGE_BLOCK_RATIO`) so a paid quota
+or free tier is never exceeded — no surprise charges. Search backends meter their *billed* queries
+explicitly (one SerpAPI credit = one `search.json` call, not every page fetch); the discovery tool counts
+against the **same** SerpAPI budget. Limits (env-overridable): `serpapi` 100, `brave` 2000, `duckduckgo`
+2000; all other sources are counted for visibility with no limit (`unlimited`/`free`). Counts reset on the
+1st of the month. Each run prints an **API / source usage** table (used / limit / remaining / % / status),
+and `discover_ats_companies.py` stops early if the SerpAPI guard trips.
+
 **Incremental runs & caching.** Every run upserts into SQLite, so `--new-only true` exports just the
 postings that weren't in the DB before this run — a daily job then surfaces only what's genuinely new.
 The conditional HTTP cache (ETag/Last-Modified) is also persisted to `data/http_cache.json`
