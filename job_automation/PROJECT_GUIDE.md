@@ -371,6 +371,12 @@ prior job: normalized URL (tracking params stripped), `deduplication_key`, or a 
   small companies without a published headcount are not lost.
 - Threshold via `MAX_COMPANY_EMPLOYEES` (default 200). Applied in `main.py` **and** in
   `export_word_from_excel.py`.
+- **Headcount overrides (`company_sizes.yaml`)** — most postings carry no size, so the filter rarely
+  bit. Curate `company -> employee count` there (`lookup_company_size`, matched by normalized name,
+  legal suffixes/accents ignored) and it takes priority over text inference. A few large companies
+  (Siemens, SAP, Reddit, …) are seeded so they never slip back into the export.
+- **join.com headcount** — set `JOIN_FETCH_COMPANY_SIZE=true` to have the `join` source fetch each
+  company page for its real "11-50 employees" range (one extra request per company; off by default).
 
 **Min-score** — only `relevance_score >= --min-score` jobs are exported (all scored jobs are still
 written to SQLite).

@@ -1,0 +1,25 @@
+# Curated company -> employee-count overrides.
+#
+# Most job postings carry no parseable headcount, so the <200-employee filter
+# can't bite. List companies here (by name; legal suffixes like GmbH/AG/Inc and
+# accents are ignored when matching) to give the filter ground truth. A value
+# can be a bare number (e.g. 90000) or a range/label (e.g. "11-50", "1,001+").
+# Anything whose lower bound exceeds MAX_COMPANY_EMPLOYEES (200) is dropped.
+#
+# Add your own as you discover them. A few obvious large companies are seeded so
+# they never slip back into the export:
+
+Siemens Energy: 90000
+Siemens: 300000
+Reddit: 2000
+Lyft: 22000
+Palantir: 3500
+SAP: 100000
+Bosch: 400000
+Deloitte: 450000
+Accenture: 740000
+Amazon: 1500000
+Google: 180000
+Microsoft: 220000
+Boomi: 2000
+Kong: 700

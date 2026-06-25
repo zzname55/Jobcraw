@@ -76,6 +76,13 @@ COMPANIES_FILE = Path(os.getenv("COMPANIES_FILE", str(BASE_DIR / "companies.yaml
 # defaults are used. See matching/targeting.py.
 TARGETING_FILE = Path(os.getenv("TARGETING_FILE", str(BASE_DIR / "targeting.yaml")))
 
+# Curated company -> employee-count overrides so the <200-employee filter actually
+# bites for known companies (most postings carry no parseable size). User-editable.
+COMPANY_SIZES_FILE = Path(os.getenv("COMPANY_SIZES_FILE", str(BASE_DIR / "company_sizes.yaml")))
+# Opt-in: have the join.com scraper fetch each company page for its headcount
+# (one extra request per company). Off by default to keep runs fast.
+JOIN_FETCH_COMPANY_SIZE = env_bool("JOIN_FETCH_COMPANY_SIZE", False)
+
 # Extra RSS/Atom job feeds for the generic RSS scraper (comma-separated URLs).
 # Empty means use the scraper's built-in default feed list.
 RSS_FEEDS = [url.strip() for url in os.getenv("RSS_FEEDS", "").split(",") if url.strip()]

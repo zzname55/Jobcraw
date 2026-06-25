@@ -16,7 +16,7 @@ from config import (
     SCRAPER_RATE_LIMIT_SECONDS,
 )
 from database.models import Job
-from matching.company_intel import extract_company_size
+from matching.company_intel import extract_company_size, lookup_company_size
 from matching.language_detection import detect_language
 from matching.region_detection import detect_location_details
 from matching.remote_detection import detect_remote_type
@@ -95,7 +95,12 @@ class BaseScraper(ABC):
             job.city = job.city or details["city"]
         if not job.required_skills:
             job.required_skills = extract_skills(text)
-        if not job.company_size or job.company_size == "unknown":
+        # A curated headcount override (by company name) is authoritative; it makes
+        # the <200-employee filter bite for known companies the posting never sizes.
+        override = lookup_company_size(job.company_name)
+        if override:
+            job.company_size, job.company_size_source = override
+        elif not job.company_size or job.company_size == "unknown":
             job.company_size, job.company_size_source = extract_company_size(text)
         job.is_startup_likely = job.is_startup_likely or any(term in text.lower() for term in ["startup", "early-stage", "saas", "y combinator"])
         return job

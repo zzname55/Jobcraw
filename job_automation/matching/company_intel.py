@@ -1,6 +1,12 @@
 from __future__ import annotations
 
 import re
+import unicodedata
+from functools import lru_cache
+
+import yaml
+
+from config import COMPANY_SIZES_FILE
 
 
 EMPLOYEE_BUCKETS = [
@@ -69,6 +75,59 @@ def parse_employee_floor(company_size: str) -> int | None:
     if not numbers:
         return None
     return _to_int(numbers[0])
+
+
+def _normalize_company_key(name: str) -> str:
+    """Lowercase, strip accents/legal suffixes/punctuation for stable matching."""
+    text = unicodedata.normalize("NFKD", (name or "").lower()).encode("ascii", "ignore").decode("ascii")
+    text = re.sub(r"[^\w\s]", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    for suffix in (" gmbh", " ag", " se", " inc", " llc", " ltd", " bv", " oy", " ab", " co"):
+        if text.endswith(suffix):
+            text = text[: -len(suffix)].strip()
+    return text
+
+
+@lru_cache(maxsize=1)
+def _company_size_overrides() -> dict[str, str]:
+    """Load the curated {normalized company -> size} map once (empty if absent)."""
+    try:
+        with open(COMPANY_SIZES_FILE, encoding="utf-8") as handle:
+            data = yaml.safe_load(handle) or {}
+    except (FileNotFoundError, OSError, yaml.YAMLError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    overrides: dict[str, str] = {}
+    for name, value in data.items():
+        key = _normalize_company_key(str(name))
+        if key:
+            overrides[key] = str(value).strip()
+    return overrides
+
+
+def lookup_company_size(company_name: str) -> tuple[str, str] | None:
+    """Return (size_label, source) from the curated override file, or None."""
+    if not company_name:
+        return None
+    size = _company_size_overrides().get(_normalize_company_key(company_name))
+    if not size:
+        return None
+    if size.isdigit():  # a bare integer -> normalize to a bucket label
+        return _bucket_for(int(size)), "size override file"
+    return size, "size override file"
+
+
+def parse_headcount_text(text: str) -> str:
+    """Extract a '1-10' / '11-50' / '500+' headcount label from free page text."""
+    lowered = (text or "").lower()
+    range_match = re.search(r"(\d[\d.,]*)\s*[-–]\s*(\d[\d.,]*)\s*(?:employees|mitarbeiter)", lowered)
+    if range_match:
+        return f"{_to_int(range_match.group(1))}-{_to_int(range_match.group(2))}"
+    plus_match = re.search(r"(\d[\d.,]*)\+\s*(?:employees|mitarbeiter)", lowered)
+    if plus_match:
+        return f"{_to_int(plus_match.group(1))}+"
+    return ""
 
 
 def exceeds_employee_limit(company_size: str, limit: int = 200) -> bool:

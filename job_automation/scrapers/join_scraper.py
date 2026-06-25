@@ -4,7 +4,9 @@ import random
 import re
 import time
 
+import config
 from database.models import Job
+from matching.company_intel import parse_headcount_text
 from matching.relevance import is_relevant_text
 from scrapers.base_scraper import BaseScraper
 from scrapers.jsonld import extract_job_posting, job_posting_fields
@@ -46,6 +48,10 @@ class JoinScraper(BaseScraper):
         "AI Agent Engineer",
         "LLM Automation Engineer",
     ]
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._size_cache: dict[str, str] = {}
 
     def search(self, region: str = "worldwide", remote: bool = True) -> list[Job]:
         urls = self._discover_urls(region)
@@ -110,6 +116,9 @@ class JoinScraper(BaseScraper):
         title = fields["title"]
         if not title or not is_relevant_text(title):
             return None
+        organization = posting.get("hiringOrganization")
+        company_url = organization.get("url", "") if isinstance(organization, dict) else ""
+        company_size = self._company_headcount(company_url)
         return Job(
             job_title=title[:160],
             company_name=fields["company"][:80] or "Unknown",
@@ -121,7 +130,26 @@ class JoinScraper(BaseScraper):
             date_posted=fields["date_posted"],
             job_description=fields["description"],
             salary=fields["salary"],
+            company_size=company_size or "unknown",
+            company_size_source="join.com company page" if company_size else "",
         )
+
+    def _company_headcount(self, company_url: str) -> str:
+        """Fetch the join.com company page for its headcount (opt-in, memoized)."""
+        if not config.JOIN_FETCH_COMPANY_SIZE or not company_url:
+            return ""
+        if company_url in self._size_cache:
+            return self._size_cache[company_url]
+        size = ""
+        try:
+            response = self.get(company_url)
+            if response.status_code < 400:
+                size = parse_headcount_text(response.text)
+        except Exception as error:
+            self.handle_errors(error)
+        self._size_cache[company_url] = size
+        self._pace()
+        return size
 
     def _pace(self) -> None:
         if self.rate_limit_seconds > 0:
