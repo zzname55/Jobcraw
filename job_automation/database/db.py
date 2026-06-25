@@ -126,6 +126,11 @@ class JobDatabase:
                 rows += 1
         return rows
 
+    def existing_keys(self) -> set[str]:
+        """All deduplication keys already stored -- the 'seen' set for incremental runs."""
+        with self.connect() as connection:
+            return {row[0] for row in connection.execute("SELECT deduplication_key FROM jobs").fetchall() if row[0]}
+
     def fetch_jobs(self, min_score: int = 0) -> list[Job]:
         with self.connect() as connection:
             rows = connection.execute(

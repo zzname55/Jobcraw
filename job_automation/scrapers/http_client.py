@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import atexit
+import base64
+import json
 import logging
 import random
 import time
+from pathlib import Path
 from urllib.parse import urlparse
 from urllib.robotparser import RobotFileParser
 
 import requests
+from requests.structures import CaseInsensitiveDict
 
 
 # A small pool of real, current desktop browser User-Agent strings. Rotating
@@ -63,6 +68,7 @@ class HttpClient:
         respect_robots: bool = False,
         enable_cache: bool = True,
         circuit_breaker_threshold: int = 5,
+        cache_path: Path | str | None = None,
     ) -> None:
         self.rate_limit_seconds = rate_limit_seconds
         self.jitter_seconds = jitter_seconds
@@ -87,6 +93,12 @@ class HttpClient:
         self._cache: dict[str, dict] = {}
         self._failures: dict[str, int] = {}
         self._circuit_open: set[str] = set()
+        # Optional cross-run persistence of the conditional cache (ETag/Last-Modified
+        # validators + body). Safe because the server still validates via 304.
+        self.cache_path = Path(cache_path) if cache_path else None
+        if self.cache_path and self.enable_cache:
+            self._load_cache()
+            atexit.register(self.save_cache)
 
     def get(self, url: str, **kwargs) -> requests.Response:
         """GET ``url`` politely. Returns a 2xx (or cached 304) response.
@@ -138,7 +150,8 @@ class HttpClient:
 
             if cached is not None and response.status_code == 304:
                 self._record_success(host)
-                return cached["response"]
+                # Prefer the in-memory response; fall back to one rebuilt from disk.
+                return cached.get("response") or self._reconstruct(cached.get("meta") or {})
             if response.status_code >= 400:
                 self._record_failure(host)
                 response.raise_for_status()
@@ -202,7 +215,73 @@ class HttpClient:
         etag = response.headers.get("ETag")
         last_modified = response.headers.get("Last-Modified")
         if etag or last_modified:
-            self._cache[url] = {"etag": etag, "last_modified": last_modified, "response": response}
+            self._cache[url] = {
+                "etag": etag,
+                "last_modified": last_modified,
+                "response": response,
+                "meta": self._serialize_response(response),
+            }
+
+    # -- persistent conditional cache ---------------------------------------
+
+    @staticmethod
+    def _serialize_response(response: requests.Response) -> dict | None:
+        content = getattr(response, "content", None)
+        if content is None:  # tolerate lightweight/fake responses without .content
+            content = (getattr(response, "text", "") or "").encode("utf-8", "ignore")
+        if len(content) > 2_000_000:  # don't bloat the cache file with huge bodies
+            return None
+        headers = getattr(response, "headers", {}) or {}
+        return {
+            "status_code": getattr(response, "status_code", 200),
+            "content": base64.b64encode(content).decode("ascii"),
+            "headers": {key: value for key, value in headers.items() if key.lower() in {"content-type", "etag", "last-modified"}},
+            "encoding": getattr(response, "encoding", None),
+            "url": getattr(response, "url", ""),
+        }
+
+    @staticmethod
+    def _reconstruct(meta: dict) -> requests.Response:
+        rebuilt = requests.Response()
+        rebuilt.status_code = meta.get("status_code", 200)
+        rebuilt._content = base64.b64decode(meta["content"]) if meta.get("content") else b""
+        rebuilt.headers = CaseInsensitiveDict(meta.get("headers", {}))
+        rebuilt.url = meta.get("url", "")
+        rebuilt.encoding = meta.get("encoding")
+        return rebuilt
+
+    def _load_cache(self) -> None:
+        try:
+            data = json.loads(self.cache_path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            return
+        if not isinstance(data, dict):
+            return
+        for url, entry in data.items():
+            if isinstance(entry, dict) and entry.get("meta"):
+                self._cache[url] = {"etag": entry.get("etag"), "last_modified": entry.get("last_modified"), "meta": entry["meta"], "response": None}
+
+    def save_cache(self) -> None:
+        """Merge this client's conditional cache into the shared file on disk."""
+        if not self.cache_path or not self.enable_cache:
+            return
+        try:
+            merged = json.loads(self.cache_path.read_text(encoding="utf-8"))
+            if not isinstance(merged, dict):
+                merged = {}
+        except (FileNotFoundError, json.JSONDecodeError, OSError):
+            merged = {}
+        for url, entry in self._cache.items():
+            meta = entry.get("meta")
+            if meta:
+                merged[url] = {"etag": entry.get("etag"), "last_modified": entry.get("last_modified"), "meta": meta}
+        try:
+            self.cache_path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.cache_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(merged), encoding="utf-8")
+            tmp.replace(self.cache_path)
+        except OSError as error:
+            self.logger.info("could not persist HTTP cache: %s", error)
 
     # -- robots.txt ----------------------------------------------------------
 

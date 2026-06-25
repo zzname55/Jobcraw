@@ -191,3 +191,24 @@ def test_circuit_breaker_opens_after_threshold(monkeypatch):
     with pytest.raises(CircuitOpenError):
         client.get("https://flaky.example.com/x")  # short-circuits, no network call
     assert len(session.calls) == calls_before
+
+
+def test_conditional_cache_persists_across_clients(monkeypatch, tmp_path):
+    cache_file = tmp_path / "http_cache.json"
+    url = "https://example.com/feed.rss"
+
+    # Client 1 fetches a 200 with an ETag, then persists the cache to disk.
+    first = FakeResponse(200, {"ETag": "v1", "Content-Type": "application/rss+xml"}, "<rss>cached body</rss>")
+    client1 = _client(FakeSession([first]), monkeypatch, enable_cache=True, cache_path=cache_file)
+    assert client1.get(url).status_code == 200
+    client1.save_cache()
+    assert cache_file.exists()
+
+    # Client 2 (fresh process simulation) loads the cache and gets a 304 -> the
+    # body is reconstructed from disk, and the validator is re-sent.
+    session2 = FakeSession([FakeResponse(304)])
+    client2 = _client(session2, monkeypatch, enable_cache=True, cache_path=cache_file)
+    response = client2.get(url)
+    assert response.status_code == 200
+    assert "cached body" in response.text
+    assert session2.calls[0]["headers"].get("If-None-Match") == "v1"

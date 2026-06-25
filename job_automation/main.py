@@ -136,12 +136,16 @@ def run(
     export: str = typer.Option("xlsx", help="xlsx / docx / csv / both / all / none"),
     sources: str | None = typer.Option(None, help="Comma separated sources, e.g. remoteok,weworkremotely,yc"),
     limit: int = typer.Option(MAX_JOBS_PER_SOURCE, help="Maximum jobs per source"),
+    new_only: str = typer.Option("false", help="Export only postings not seen in a previous run (incremental)"),
     dashboard: str = typer.Option("false", help="true/false"),
 ) -> None:
     setup_logging()
     remote_only = parse_bool(remote)
+    incremental = parse_bool(new_only)
     db = JobDatabase(DB_PATH)
     db.init()
+    # Snapshot the 'seen' set BEFORE this run upserts, so we can tell new from old.
+    previously_seen = db.existing_keys()
 
     raw_jobs: list[Job] = []
     for scraper in selected_scrapers(sources, limit):
@@ -156,9 +160,11 @@ def run(
     all_scored = sorted(score_jobs(unique_jobs), key=lambda job: job.relevance_score, reverse=True)
     scored_jobs = [job for job in all_scored if not exceeds_employee_limit(job.company_size, MAX_COMPANY_EMPLOYEES)]
     removed_large_companies = len(all_scored) - len(scored_jobs)
+    new_jobs = [job for job in scored_jobs if job.deduplication_key not in previously_seen]
     db.upsert_jobs(scored_jobs)
 
-    exportable_jobs = [job for job in scored_jobs if job.relevance_score >= min_score]
+    candidate_jobs = new_jobs if incremental else scored_jobs
+    exportable_jobs = [job for job in candidate_jobs if job.relevance_score >= min_score]
     export_mode = export.lower()
     csv_path: Path | None = None
     xlsx_path: Path | None = None
@@ -176,7 +182,11 @@ def run(
     console.print(f"Removed {len(raw_jobs) - len(unique_jobs)} duplicates.")
     console.print(f"Removed {removed_large_companies} jobs from companies over {MAX_COMPANY_EMPLOYEES} employees.")
     console.print(f"Scored {len(scored_jobs)} jobs.")
-    console.print(f"Exported {len(exportable_jobs)} jobs with score >= {min_score}.")
+    console.print(f"New since last run: {len(new_jobs)} jobs ({len(previously_seen)} already seen).")
+    if incremental:
+        console.print(f"Exported {len(exportable_jobs)} NEW jobs with score >= {min_score} (incremental mode).")
+    else:
+        console.print(f"Exported {len(exportable_jobs)} jobs with score >= {min_score}.")
     if csv_path:
         console.print(f"CSV saved to {csv_path}")
     if xlsx_path:

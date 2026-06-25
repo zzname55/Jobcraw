@@ -61,6 +61,9 @@ HTTP_JITTER_SECONDS = float(os.getenv("HTTP_JITTER_SECONDS", "0.75"))
 HTTP_RESPECT_ROBOTS = env_bool("HTTP_RESPECT_ROBOTS", True)
 HTTP_ENABLE_CACHE = env_bool("HTTP_ENABLE_CACHE", True)
 HTTP_CIRCUIT_BREAKER_THRESHOLD = int(os.getenv("HTTP_CIRCUIT_BREAKER_THRESHOLD", "5"))
+# Persist the conditional (ETag/Last-Modified) HTTP cache across runs. Empty to
+# disable. Safe to keep: a cached body is only reused on a server 304.
+HTTP_CACHE_PATH = os.getenv("HTTP_CACHE_PATH", str(DATA_DIR / "http_cache.json"))
 
 # List of target company ATS slugs for the key-free ATS scraper.
 COMPANIES_FILE = Path(os.getenv("COMPANIES_FILE", str(BASE_DIR / "companies.yaml")))

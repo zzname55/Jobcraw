@@ -19,6 +19,8 @@ data/exports/
 data/logs/
 data/serpapi_capture/
 data/ddg_capture/
+data/http_cache.json
+data/http_cache.tmp
 
 # OS / editor
 .DS_Store

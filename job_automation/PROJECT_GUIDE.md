@@ -210,9 +210,16 @@ this schema and calls `BaseScraper.normalize_job()`. Key fields:
 | `--remote` | `true` | `true`/`false`. |
 | `--min-score` | `60` (`DEFAULT_MIN_SCORE`) | Minimum score to export. |
 | `--export` | `xlsx` | `xlsx` / `docx` / `csv` / `both` (csv+xlsx) / `all` (csv+xlsx+docx) / `none`. |
-| `--sources` | (the six defaults) | Comma-separated source keys from the table above. |
+| `--sources` | the free stack | Comma-separated source keys from the table above. |
 | `--limit` | `50` (`MAX_JOBS_PER_SOURCE`) | Max jobs per source (for `generic`, max queries). |
+| `--new-only` | `false` | Incremental mode: export only postings not seen in a previous run (compared against the SQLite store by deduplication key). Ideal for a daily scheduled run. |
 | `--dashboard` | `false` | Print the Streamlit launch hint. |
+
+**Incremental runs & caching.** Every run upserts into SQLite, so `--new-only true` exports just the
+postings that weren't in the DB before this run — a daily job then surfaces only what's genuinely new.
+The conditional HTTP cache (ETag/Last-Modified) is also persisted to `data/http_cache.json`
+(`HTTP_CACHE_PATH`), so unchanged feeds return a fast `304` across runs. Both are safe: the cache only
+reuses a body when the server itself answers `304 Not Modified`.
 
 ### Environment variables (`.env`, loaded by `config.py`)
 

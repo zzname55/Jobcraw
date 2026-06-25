@@ -7,6 +7,7 @@ from typing import Any
 import requests
 
 from config import (
+    HTTP_CACHE_PATH,
     HTTP_CIRCUIT_BREAKER_THRESHOLD,
     HTTP_ENABLE_CACHE,
     HTTP_JITTER_SECONDS,
@@ -61,6 +62,7 @@ class BaseScraper(ABC):
             respect_robots=HTTP_RESPECT_ROBOTS,
             enable_cache=HTTP_ENABLE_CACHE,
             circuit_breaker_threshold=HTTP_CIRCUIT_BREAKER_THRESHOLD,
+            cache_path=HTTP_CACHE_PATH or None,
         )
         # Backward-compatible alias; some scrapers/tests reference ``session``.
         self.session = self.http.session
