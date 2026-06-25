@@ -21,7 +21,14 @@ def test_country_only_is_title_cased():
 def test_work_mode_words_never_appear_as_location():
     # No city/country known -> strip the work-mode word; only "Europe" is a place.
     assert display_location(_job(location="Remote Europe")) == "Europe"
-    assert display_location(_job(location="Hybrid DACH")) == "Dach"
+    assert display_location(_job(location="Hybrid DACH")) == "DACH"
+
+
+def test_specific_free_text_city_beats_bare_country():
+    # "Garching" is not a known city, but the free-text "Garching, Germany" is more
+    # specific than the detected country alone -> keep the richer one.
+    job = _job(city="Unknown", country="germany", location="Remote - Garching, Germany")
+    assert display_location(job) == "Garching, Germany"
 
 
 def test_pure_remote_or_worldwide_becomes_unknown():

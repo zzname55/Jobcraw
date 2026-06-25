@@ -17,18 +17,30 @@ _WORK_MODE_RE = re.compile(
 
 
 def _strip_work_mode(text: str) -> str:
-    """Drop remote/hybrid/worldwide words and leftover separators from free text."""
+    """Drop remote/hybrid/worldwide words from free text, keeping the real place.
+
+    Commas are preserved so a "Garching, Germany" survives as a city+country pair;
+    only bracket/slash/pipe/dash separators and stray punctuation are cleaned up.
+    """
     cleaned = _WORK_MODE_RE.sub(" ", text or "")
-    cleaned = re.sub(r"[\s,;/|()\-–—]+", " ", cleaned).strip()
+    cleaned = re.sub(r"[/|()\[\]–—-]+", " ", cleaned)
+    cleaned = re.sub(r"\s*,\s*", ", ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,")
     return cleaned if any(character.isalpha() for character in cleaned) else ""
+
+
+def _specificity(value: str) -> tuple[int, int, int]:
+    """Rank a location string: a city+country (comma) beats a bare country."""
+    return (1 if "," in value else 0, len(value.split()), len(value))
 
 
 def display_location(job: Job) -> str:
     """Real geographic location for the Location column.
 
-    Never returns "Remote"/"Hybrid" (that lives in the Remote column). Prefers the
-    detected city/country, falls back to the free-text location with work-mode
-    words stripped, and uses "Unknown" when no real place is known.
+    Never returns "Remote"/"Hybrid" (that lives in the Remote column). Picks the
+    more specific of the detected city/country and the free-text location (with
+    work-mode words stripped) -- so "Garching, Germany" wins over a bare
+    "Germany" -- and uses "Unknown" when no real place is known.
     """
     city = (job.city or "").strip()
     if city.lower() in {"", "unknown"}:
@@ -37,13 +49,19 @@ def display_location(job: Job) -> str:
     if country.lower() in {"", "unknown"}:
         country = ""
     if city and country:
-        return f"{city}, {country.title()}"
-    if city:
-        return city
-    if country:
-        return country.title()
-    geographic = _strip_work_mode(job.location or "")
-    return geographic.title() if geographic else "Unknown"
+        structured = f"{city}, {country.title()}"
+    elif city:
+        structured = city
+    elif country:
+        structured = country.title()
+    else:
+        structured = ""
+
+    free_text = _strip_work_mode(job.location or "")
+    candidates = [value for value in (free_text, structured) if value]
+    if not candidates:
+        return "Unknown"
+    return max(candidates, key=_specificity)
 
 
 def build_job_record(job: Job, search_run_at: str) -> dict[str, str | int]:
