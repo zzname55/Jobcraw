@@ -31,6 +31,7 @@ from scrapers.mock_website_scraper import MockWebsiteScraper
 from scrapers.remoteok_scraper import RemoteOKScraper
 from scrapers.remotive_scraper import RemotiveScraper
 from scrapers.weworkremotely_scraper import WeWorkRemotelyScraper
+from scrapers.workingnomads_scraper import WorkingNomadsScraper
 from scrapers.wellfound_scraper import WellfoundScraper
 from scrapers.yc_jobs_scraper import YCJobsScraper
 
@@ -51,6 +52,7 @@ SCRAPER_REGISTRY = {
     "ats": AtsScraper,
     "hackernews": HackerNewsHiringScraper,
     "rss": RssFeedScraper,
+    "workingnomads": WorkingNomadsScraper,
     "mock": MockWebsiteScraper,
     "manual": ManualSourceScraper,
     "join": JoinScraper,

@@ -27,6 +27,8 @@ class RssFeedScraper(BaseScraper):
     default_feeds = [
         "https://himalayas.app/jobs/rss",
         "https://weworkremotely.com/categories/remote-programming-jobs.rss",
+        "https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss",
+        "https://weworkremotely.com/categories/remote-devops-sysadmin-jobs.rss",
         "https://jobspresso.co/?feed=job_feed",
     ]
 

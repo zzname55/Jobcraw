@@ -191,6 +191,30 @@ crawler do the heavy, repeatable fetching against ATS APIs.
   to wire up today. The capability is here for a future ToS-allowed, API-less source, and any scraper
   using it must still respect robots.txt and rate limits.
 
+**Phase 6 — free SerpAPI-equivalent reach + more free sources** — ✅ **done**
+- *What was missing vs SerpAPI:* a real **web-search backend**. The free API/feed sources only see their
+  own boards; SerpAPI's edge was Google's whole-web index. `scrapers/generic_search_scraper.py`
+  `DuckDuckGoSearchScraper` (`--sources duckduckgo`) closes that gap: it runs the same targeted queries
+  against DuckDuckGo via the key-free `ddgs` library and reuses *all* of the `generic` scraper's noise
+  filtering and company extraction. No key, no credits. A live run matched the SerpAPI run's yield of
+  scored jobs. This is the path to dropping SerpAPI entirely.
+- **Working Nomads** (`scrapers/workingnomads_scraper.py`, `--sources workingnomads`): a single public
+  JSON endpoint (`/api/exposed_jobs/`, robots-open) adds more free remote AI/automation coverage,
+  title-filtered with the shared relevance pre-filter.
+- **join.com** (`scrapers/join_scraper.py`, `--sources join`) — *promoted from placeholder, robots-respecting.*
+  join.com has no public job API and its search loads over private XHR (reverse-engineering it would be
+  fragile/grey-area). Instead the scraper uses only what join.com publishes for crawlers: it discovers
+  posting URLs through DuckDuckGo `site:join.com`, then reads each public posting's embedded schema.org
+  `JobPosting` JSON-LD (postings live under `/companies/`, which robots.txt allows — only `/lp/*` is
+  disallowed). That yields the **real** hiring company, full location and description instead of a guess,
+  and expired postings (HTTP 410) are skipped. A live run surfaced exactly-on-target DACH AI-automation
+  startup roles (junior AI-automation / n8n specialists). Offline tests in `tests/test_join_scraper.py`,
+  `tests/test_workingnomads_scraper.py`, `tests/test_duckduckgo_scraper.py`.
+- *Risks flagged for join.com:* it sits behind Cloudflare and its sitemap index 403s non-search-engine
+  clients, so discovery deliberately relies on DuckDuckGo rather than enumerating join.com directly; the
+  JSON-LD schema could change; and politeness still applies (paced requests, robots respected). If join.com
+  ever blocks the posting pages too, the `duckduckgo` source still surfaces the same listings from snippets.
+
 Each phase is independently shippable and testable offline (monkeypatched HTTP + saved fixtures), the
 same pattern as `test_serpapi_quality_pipeline.py`.
 

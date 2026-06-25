@@ -81,9 +81,12 @@ Implemented sources:
 - Arbeitnow via public API
 - We Work Remotely via public RSS feed
 - Generic Search via SerpAPI when `SERPAPI_API_KEY` is set
+- DuckDuckGo free web search via `--sources duckduckgo`, key-free — the closest free stand-in for SerpAPI's reach (needs `pip install ddgs`)
 - ATS boards (Greenhouse + Lever + Ashby + Workable) via `--sources ats`, key-free; list company slugs in `companies.yaml`
 - Hacker News "Ask HN: Who is hiring?" monthly thread via `--sources hackernews`, key-free
 - RSS/Atom job feeds via `--sources rss`, key-free; configurable with `RSS_FEEDS`
+- Working Nomads via public JSON feed (`--sources workingnomads`), key-free
+- JOIN via `--sources join`, key-free — discovers postings through DuckDuckGo `site:join.com`, then reads each posting's public schema.org `JobPosting` data (robots-respecting); strong for DACH AI-automation startups
 - Manual import via `manual_jobs.csv`
 - Mock source for offline testing via `--sources mock`
 
@@ -91,7 +94,6 @@ Defensive placeholders:
 
 - YC Jobs
 - Wellfound
-- JOIN
 - GermanTechJobs
 - BerlinStartupJobs
 

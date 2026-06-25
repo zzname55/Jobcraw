@@ -148,13 +148,16 @@ Default when `--sources` is omitted: `remoteok, remotive, arbeitnow, weworkremot
 | `arbeitnow` | Public JSON API | No | `GET arbeitnow.com/api/job-board-api` pages 1–3 (Germany/EU focused). |
 | `weworkremotely` | Public RSS feed | No | Parses the `/remote-jobs.rss` feed (the HTML search 403s non-browsers; the feed is published for consumption). Keeps AI/automation-relevant items. |
 | `generic` | **Search API + page fetch** | **Yes (SerpAPI)** | The self-built search scraper. Builds targeted queries, calls SerpAPI, filters noise, optionally fetches each job-detail page for richer text. See `SCRAPER_ROADMAP.md`. |
+| `duckduckgo` | **Free web search** | No | Same targeted queries as `generic`, but against DuckDuckGo via the key-free `ddgs` library — the closest free stand-in for SerpAPI's "search the whole web" strategy. Reuses all of `generic`'s noise filtering and company extraction; snippets only (no detail fetch), paced and capped by `--limit`. This is the recommended SerpAPI-free way to match SerpAPI's reach. |
 | `cached` | **Replays SerpAPI captures** | No | Re-parses previously captured SerpAPI responses (`SERPAPI_CAPTURE_DIR`) into jobs offline — keeps the value of past paid searches without spending new credits. |
 | `ats` | **ATS JSON APIs** | No | Key-free scraper for Greenhouse + Lever + Ashby + Workable public job boards. Reads company slugs from `companies.yaml`, keeps AI/automation-relevant titles, maps to `Job`. This is the recommended SerpAPI-free path — see `SCRAPER_ROADMAP.md`. |
 | `hackernews` | **HN Algolia API** | No | Parses the monthly "Ask HN: Who is hiring?" thread (key-free). Extracts company/role/location/remote from each top-level comment; keeps only AI/automation-relevant postings. Rich in AI startups. |
-| `rss` | **RSS/Atom feeds** | No | Generic feed scraper (Himalayas, WeWorkRemotely categories, Jobspresso by default; add more via `RSS_FEEDS`). Extracts the company from a `<company>`/`<companyName>`/`<dc:creator>` tag or a "Company: Role" title; title-based relevance filter. |
+| `rss` | **RSS/Atom feeds** | No | Generic feed scraper (Himalayas, three WeWorkRemotely categories, Jobspresso by default; add more via `RSS_FEEDS`). Extracts the company from a `<company>`/`<companyName>`/`<dc:creator>` tag or a "Company: Role" title; title-based relevance filter. |
+| `workingnomads` | **Public JSON feed** | No | `GET workingnomads.com/api/exposed_jobs/` (robots.txt allows all). Broad remote board, so each posting is title-filtered with the shared relevance pre-filter. Adds extra free remote AI/automation coverage. |
+| `join` | **Sitemap-grade JSON-LD** | No | Robots-respecting join.com scraper. Discovers posting URLs via DuckDuckGo `site:join.com`, then reads each public posting's embedded schema.org `JobPosting` (allowed under `/companies/`; only `/lp/*` is disallowed). Yields the **real** hiring company, full location and description — not a guess. Skips expired (HTTP 410) postings. Strong for DACH AI-automation startups. |
 | `mock` | Offline fixtures | No | `scrapers/mock_website_scraper.py` — deterministic jobs for testing the whole pipeline offline. |
 | `manual` | CSV import | No | Reads `manual_jobs.csv` (same columns as the `Job` model). |
-| `yc`, `wellfound`, `join`, `germantechjobs`, `berlinstartupjobs` | **Placeholders** | No | Return `[]` and log a note. They exist as extension points; these boards are JS-heavy or ToS-sensitive and should be reached via approved APIs/feeds, not raw scraping. |
+| `yc`, `wellfound`, `germantechjobs`, `berlinstartupjobs` | **Placeholders** | No | Return `[]` and log a note. They exist as extension points; these boards are JS-heavy or ToS-sensitive and should be reached via approved APIs/feeds, not raw scraping. |
 
 **SerpAPI gating.** `generic` only runs when `SERPAPI_API_KEY` is set in `.env`. Each generated query
 consumes one SerpAPI credit, so `--limit` on the `generic` source caps the number of queries. Without
@@ -381,6 +384,9 @@ Run with `pytest` (see the temp/cache note in [section 3](#3-quick-start)). File
 | `test_discover.py` | ATS discovery: slug extraction per provider, invalid-slug rejection, aggregation, companies.yaml merge. |
 | `test_render.py` | Opt-in Playwright JS rendering: disabled raises, enabled returns rendered HTML (mocked). |
 | `test_cached_scraper.py` | Cached source replays captured SerpAPI responses offline; rejects aggregator noise. |
+| `test_duckduckgo_scraper.py` | Free DuckDuckGo backend: parses results, rejects aggregator noise, missing-library path returns `[]`. |
+| `test_workingnomads_scraper.py` | Working Nomads JSON feed: parse + title relevance filter, non-list payload guard. |
+| `test_join_scraper.py` | join.com JSON-LD: real company/location parsing, entity decode, skips 410/off-target, posting-URL filter, missing-library path. |
 | `test_scraper_quality.py` | Relevance pre-filter (AI/tool signals), text sanitizer, RemoteOK/Arbeitnow filtering, WeWorkRemotely RSS parsing. |
 
 Tests import top-level modules (`config`, `database.models`, …), so run them from inside the project
@@ -458,7 +464,8 @@ After any behaviour change: run `pytest`, and **update this guide and the README
   often, which matters most for the discovery-loop companies (today most postings have unknown size and
   are kept by design).
 - **Bing/Google search parsing** — keys are recognized but parsing is unimplemented.
-- **Implement the placeholder sources** (YC, Wellfound, JOIN, …) via official APIs / approved feeds.
+- **Implement the remaining placeholder sources** (YC, Wellfound, …) via official APIs / approved feeds.
+  (JOIN is now implemented via DuckDuckGo discovery + schema.org `JobPosting` data — see the sources table.)
 
 ---
 
