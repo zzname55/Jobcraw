@@ -1,0 +1,65 @@
+name: Daily job scrape
+
+# Runs the free scraper stack once a day and publishes only the NEW postings
+# (incremental). No secrets are required -- the default sources are all key-free.
+# Optional: set a BRAVE_SEARCH_API_KEY repo secret to enable the Brave backend.
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 06:00 UTC daily
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+permissions:
+  contents: read
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: job_automation
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: job_automation/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Persist the SQLite store + HTTP cache between runs so --new-only can tell
+      # new postings from ones seen on previous days. A fresh key is written each
+      # run; restore-keys pulls the most recent previous cache.
+      - name: Restore job database + HTTP cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            job_automation/jobs.db
+            job_automation/data/http_cache.json
+          key: jobs-state-${{ github.run_id }}
+          restore-keys: |
+            jobs-state-
+
+      - name: Run scraper (new postings only)
+        env:
+          BRAVE_SEARCH_API_KEY: ${{ secrets.BRAVE_SEARCH_API_KEY }}
+          NOTION_ENABLED: ${{ secrets.NOTION_API_KEY != '' }}
+          NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+        run: |
+          python main.py --region europe --remote true --min-score 60 \
+            --new-only true --export all
+
+      - name: Upload exports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: job-exports
+          path: job_automation/data/exports/
+          if-no-files-found: ignore
+          retention-days: 30
