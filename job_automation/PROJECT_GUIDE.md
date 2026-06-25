@@ -387,6 +387,8 @@ Run with `pytest` (see the temp/cache note in [section 3](#3-quick-start)). File
 | `test_duckduckgo_scraper.py` | Free DuckDuckGo backend: parses results, rejects aggregator noise, missing-library path returns `[]`. |
 | `test_workingnomads_scraper.py` | Working Nomads JSON feed: parse + title relevance filter, non-list payload guard. |
 | `test_join_scraper.py` | join.com JSON-LD: real company/location parsing, entity decode, skips 410/off-target, posting-URL filter, missing-library path. |
+| `test_jsonld.py` | Shared schema.org `JobPosting` extractor: flatten company/location/salary/description, `@graph` + `@type` list handling, TELECOMMUTE→Remote, no-posting returns `None`. |
+| `test_near_duplicate_dedup.py` | Fuzzy near-duplicate collapse: merges (m/f/d)↔(m/w/d) and "GmbH"↔"GmbH in" variants, attaches Unknown-company copies, keeps the richer record, leaves genuinely different roles apart. |
 | `test_scraper_quality.py` | Relevance pre-filter (AI/tool signals), text sanitizer, RemoteOK/Arbeitnow filtering, WeWorkRemotely RSS parsing. |
 
 Tests import top-level modules (`config`, `database.models`, …), so run them from inside the project

@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-import html
-import json
 import random
 import re
 import time
-from typing import Any
-
-from bs4 import BeautifulSoup
 
 from database.models import Job
 from matching.relevance import is_relevant_text
 from scrapers.base_scraper import BaseScraper
+from scrapers.jsonld import extract_job_posting, job_posting_fields
 
 
 class JoinScraper(BaseScraper):
@@ -107,79 +103,25 @@ class JoinScraper(BaseScraper):
             return None
         if response.status_code == 410 or response.status_code >= 400:
             return None  # expired or unavailable posting
-        posting = self._extract_job_posting(response.text)
+        posting = extract_job_posting(response.text)
         if not posting:
             return None
-        title = self._clean_text(html.unescape(str(posting.get("title") or "")))
+        fields = job_posting_fields(posting)
+        title = fields["title"]
         if not title or not is_relevant_text(title):
             return None
         return Job(
             job_title=title[:160],
-            company_name=self._org_name(posting)[:80] or "Unknown",
-            location=self._location(posting),
-            remote_type="remote" if "remote" in (posting.get("jobLocationType") or "").lower() else "unknown",
+            company_name=fields["company"][:80] or "Unknown",
+            location=fields["location"] or "Unknown",
+            remote_type="remote" if fields["remote_type"] else "unknown",
             source_platform="join.com",
             source_type=self.source_type,
             job_url=url,
-            date_posted=str(posting.get("datePosted") or ""),
-            job_description=self._description(posting),
+            date_posted=fields["date_posted"],
+            job_description=fields["description"],
+            salary=fields["salary"],
         )
-
-    def _extract_job_posting(self, page_html: str) -> dict[str, Any] | None:
-        soup = BeautifulSoup(page_html, "lxml")
-        for script in soup.find_all("script", attrs={"type": "application/ld+json"}):
-            raw = script.string or script.get_text() or ""
-            if "JobPosting" not in raw:
-                continue
-            try:
-                data = json.loads(raw)
-            except json.JSONDecodeError:
-                continue
-            for candidate in self._iter_objects(data):
-                if isinstance(candidate, dict) and candidate.get("@type") == "JobPosting":
-                    return candidate
-        return None
-
-    @staticmethod
-    def _iter_objects(data: Any):
-        if isinstance(data, list):
-            for item in data:
-                yield from JoinScraper._iter_objects(item)
-        elif isinstance(data, dict):
-            yield data
-            if "@graph" in data:
-                yield from JoinScraper._iter_objects(data["@graph"])
-
-    def _org_name(self, posting: dict[str, Any]) -> str:
-        org = posting.get("hiringOrganization")
-        if isinstance(org, dict):
-            return self._clean_text(html.unescape(str(org.get("name") or "")))
-        return self._clean_text(html.unescape(str(org or "")))
-
-    def _location(self, posting: dict[str, Any]) -> str:
-        location = posting.get("jobLocation")
-        if isinstance(location, list):
-            location = location[0] if location else None
-        if isinstance(location, dict):
-            address = location.get("address", {})
-            if isinstance(address, dict):
-                city = address.get("addressLocality") or ""
-                country = address.get("addressRegion") or address.get("addressCountry") or ""
-                joined = ", ".join(part for part in (city, country) if part)
-                if joined:
-                    return self._clean_text(joined)
-        if (posting.get("jobLocationType") or "").upper() == "TELECOMMUTE":
-            return "Remote"
-        return "Unknown"
-
-    def _description(self, posting: dict[str, Any]) -> str:
-        raw = html.unescape(str(posting.get("description") or ""))
-        text = BeautifulSoup(raw, "lxml").get_text(" ", strip=True)
-        return self._clean_text(text)[:7000]
-
-    @staticmethod
-    def _clean_text(value: str) -> str:
-        return " ".join((value or "").split())
 
     def _pace(self) -> None:
         if self.rate_limit_seconds > 0:

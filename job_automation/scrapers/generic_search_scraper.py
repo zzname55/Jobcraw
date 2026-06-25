@@ -15,6 +15,7 @@ from database.models import Job
 from matching.keywords import TARGET_TITLES
 from matching.region_detection import GEOGRAPHIC_NAMES, is_location_name
 from scrapers.base_scraper import BaseScraper
+from scrapers.jsonld import extract_job_posting, job_posting_fields
 
 
 class GenericSearchScraper(BaseScraper):
@@ -48,6 +49,12 @@ class GenericSearchScraper(BaseScraper):
         "netflix.com",
         "themoviedb.org",
         "genaisummit.eu",
+        # Search engines / portals: a result that points back at a search page is
+        # never an actual job posting.
+        "bing.com",
+        "google.com",
+        "duckduckgo.com",
+        "yahoo.com",
     }
     weak_aggregator_domains = {
         "indeed.com",
@@ -270,16 +277,30 @@ class GenericSearchScraper(BaseScraper):
             company_name = self._guess_company(title, domain)
             title = self._clean_title(title)
             description = snippet
-            page_title = ""
+            location = ""
+            salary = ""
             if self.fetch_details and detail_fetches < max_detail_fetches:
-                page_title, page_text = self._fetch_job_detail_text(link)
+                page_title, page_text, ld = self._fetch_job_detail_text(link)
                 detail_fetches += 1
-                if page_title and not self._is_noisy_result(page_title, link):
+                # Prefer schema.org JobPosting structured data when present: it is
+                # far more reliable than guessing the company from the page title.
+                if ld:
+                    if ld.get("company"):
+                        company_name = ld["company"]
+                    if ld.get("title"):
+                        title = self._clean_title(ld["title"])
+                    if ld.get("location"):
+                        location = ld["location"]
+                    if ld.get("salary"):
+                        salary = ld["salary"]
+                    if ld.get("description"):
+                        description = self._merge_description(snippet, ld["description"])
+                elif page_title and not self._is_noisy_result(page_title, link):
                     company_name = self._guess_company(page_title, domain)
                     title = self._clean_title(page_title)
-                if page_text:
+                if page_text and not (ld and ld.get("description")):
                     description = self._merge_description(snippet, page_text)
-            location = self._guess_location(query, description)
+            location = location or self._guess_location(query, description)
             job = Job(
                 job_title=title,
                 company_name=company_name,
@@ -288,6 +309,7 @@ class GenericSearchScraper(BaseScraper):
                 source_type=self.source_type,
                 job_url=link,
                 job_description=description,
+                salary=salary,
             )
             jobs.append(self.normalize_job(job))
         return jobs
@@ -355,6 +377,9 @@ class GenericSearchScraper(BaseScraper):
             cleaned,
             flags=re.IGNORECASE,
         )
+        # Drop a dangling connector left when a location tail was split off, e.g.
+        # "Vetaion GmbH in" (from "... - Vetaion GmbH in Germany") -> "Vetaion GmbH".
+        cleaned = re.sub(r"\s+(in|im|for|at|bei|f[uü]r)$", "", cleaned, flags=re.IGNORECASE)
         return cleaned.strip(" -–—|") or "Unknown"
 
     def _is_bad_company(self, candidate: str) -> bool:
@@ -372,27 +397,36 @@ class GenericSearchScraper(BaseScraper):
             return True
         if re.search(r"\b(department|abteilung|team|jetzt bewerben|bewerben|apply now|work from home|home office|remote jobs|freelancers?)\b", key):
             return True
+        # A "company" carrying a role word is almost always the job title leaking in
+        # ("n8n Automation Specialist", "Automate Complex Workflows"). "AI"/"ML" are
+        # intentionally excluded -- many real startups are named "... AI".
+        if re.search(r"\b(specialist|engineer|developer|workflow|workflows|automation|automate|manager|analyst|intern|consultant|architect|recruiter)\b", key):
+            return True
         return key in {"apply", "careers", "jobs", "remote", "hybrid", "new", "work from home", "freelance"}
 
-    def _fetch_job_detail_text(self, link: str) -> tuple[str, str]:
+    def _fetch_job_detail_text(self, link: str) -> tuple[str, str, dict[str, str]]:
         if not link.startswith(("http://", "https://")):
-            return "", ""
+            return "", "", {}
         if link.lower().endswith((".pdf", ".png", ".jpg", ".jpeg", ".zip")):
-            return "", ""
+            return "", "", {}
         try:
             response = self.get(link)
         except Exception as error:
             self.handle_errors(error)
-            return "", ""
+            return "", "", {}
         content_type = response.headers.get("content-type", "")
         if "html" not in content_type.lower():
-            return "", ""
+            return "", "", {}
+        # Read schema.org JobPosting JSON-LD from the raw HTML *before* stripping
+        # <script> tags below (the JSON-LD lives in a script tag).
+        posting = extract_job_posting(response.text)
+        ld_fields = job_posting_fields(posting) if posting else {}
         soup = BeautifulSoup(response.text, "lxml")
         for element in soup(["script", "style", "noscript", "svg"]):
             element.decompose()
         page_title = self._clean_title(soup.title.get_text(" ", strip=True) if soup.title else "")
         text = " ".join(soup.get_text(" ", strip=True).split())
-        return page_title, text[:6000]
+        return page_title, text[:6000], ld_fields
 
     def _clean_title(self, title: str) -> str:
         cleaned = re.sub(r"\s+", " ", title or "").strip()

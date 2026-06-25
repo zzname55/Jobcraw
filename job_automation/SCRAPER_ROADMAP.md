@@ -215,6 +215,24 @@ crawler do the heavy, repeatable fetching against ATS APIs.
   JSON-LD schema could change; and politeness still applies (paced requests, robots respected). If join.com
   ever blocks the posting pages too, the `duckduckgo` source still surfaces the same listings from snippets.
 
+**Phase 7 — head-to-head hardening (SerpAPI 20 vs free)** — ✅ **done**
+A 20-search SerpAPI run was compared against the free stack through the same scoring/dedup/<200 pipeline.
+The free stack won on nearly every axis (≥50: 18 vs 15; on-target: 13 vs 8; unique companies: 17 vs 8;
+**Unknown company: 0 vs 7**). The comparison exposed three concrete quality gaps, now fixed and
+backed by research into how production scrapers (JobSpy) and Google-for-Jobs structured data work:
+- **schema.org `JobPosting` JSON-LD extractor** (`scrapers/jsonld.py`): reading the structured data a page
+  publishes for Google Jobs is far more resilient than guessing a company from a title or CSS selectors.
+  Shared by `join` and by the search scrapers' detail-fetch path, so any fetched job page yields the real
+  hiring company, location and salary. (Borrowed from the dominant industry/JobSpy practice, applied the
+  *ethical* way — only structured data the site publishes, never ToS-protected boards.)
+- **Fuzzy near-duplicate collapse** (`matching/deduplication.collapse_near_duplicates`): a dependency-free,
+  token-set-ratio second pass that merges postings exact-key dedup misses — the same role posted "(m/f/d)"
+  and "(m/w/d)", "Vetaion GmbH" vs "Vetaion GmbH in", or an Unknown-company copy of a known posting. Keeps
+  the richer record and backfills missing fields. (Technique from RapidFuzz-style record linkage.)
+- **Company-name hygiene**: the snippet path now strips a dangling connector tail ("... GmbH in") and
+  rejects guesses that carry a role word ("n8n Automation Specialist", "Automate Complex Workflows") as the
+  job title leaking into the company field.
+
 Each phase is independently shippable and testable offline (monkeypatched HTTP + saved fixtures), the
 same pattern as `test_serpapi_quality_pipeline.py`.
 
