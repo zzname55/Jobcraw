@@ -149,6 +149,26 @@ def test_listing_site_brand_does_not_leak_as_company():
     assert "eu-startups.com" not in scraper.blocked_domains
 
 
+def test_content_articles_repos_and_magazines_are_blocked():
+    scraper = GenericSearchScraper(limit=10)
+    blocked = [
+        ("How to Become an AI Automation Specialist", "https://aiexpertmagazine.com/ai-automation-specialist"),
+        ("Building effective AI agents", "https://www.anthropic.com/research/building-effective-agents"),
+        ("GitHub - IBM/mcp: A collection of MCP servers", "https://github.com/IBM/mcp"),
+        ("Exposing Your Agent as an MCP Server", "https://medium.com/@x/exposing-your-agent"),
+        ("Claude MCP servers: complete setup guide", "https://example.dev.to/claude-mcp-setup"),
+        ("n8n Tutorial for Beginners", "https://www.w3schools.com/n8n-tutorial"),
+    ]
+    assert all(scraper._is_noisy_result(title, url) for title, url in blocked)
+
+
+def test_indeed_brand_does_not_leak_as_company():
+    # A real Indeed job page is kept, but the company shows "Unknown", not "Indeed".
+    scraper = GenericSearchScraper(limit=10)
+    assert scraper._guess_company("LLM Engineer Multi Agent Systems", "indeed.com") == "Unknown"
+    assert scraper._guess_company("AI Automation Specialist", "ziprecruiter.com") == "Unknown"
+
+
 def test_india_pakistan_job_boards_are_blocked():
     # mustakbil.com et al. are India/Pakistan boards the user bans outright.
     scraper = GenericSearchScraper(limit=10)

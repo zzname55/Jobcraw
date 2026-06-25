@@ -93,6 +93,26 @@ class GenericSearchScraper(BaseScraper):
         "jobberman.com",   # Nigeria
         "brightermonday.com",  # Kenya
         "wuzzuf.net",      # Egypt
+        # Content / article / tutorial / code-repo / docs sites: results from here
+        # are blog posts, guides or repositories, never an actual job posting.
+        "medium.com",
+        "github.com",
+        "github.io",
+        "gitlab.com",
+        "dev.to",
+        "substack.com",
+        "towardsdatascience.com",
+        "kdnuggets.com",
+        "geeksforgeeks.org",
+        "w3schools.com",
+        "freecodecamp.org",
+        "hashnode.dev",
+        "stackoverflow.com",
+        "quora.com",
+        "anthropic.com",   # docs/research pages (e.g. "Building effective AI agents")
+        "openai.com",
+        "platform.openai.com",
+        "aiexpertmagazine.com",
     }
     weak_aggregator_domains = {
         "indeed.com",
@@ -143,6 +163,9 @@ class GenericSearchScraper(BaseScraper):
         # leaks into the company field via the result title or domain. The real
         # employer is not the site, so fall back to "Unknown" (the posting is kept).
         "eu-startups.com",
+        # Big aggregators whose own brand otherwise leaks in as the company name.
+        "indeed.com",
+        "ziprecruiter.com",
         "jobsora.com",
         "neuvoo.com",
         "whatjobs.com",
@@ -188,6 +211,19 @@ class GenericSearchScraper(BaseScraper):
         "testimonials",
         "jobs - work from home",
         "best remote",
+        # Article / tutorial / guide / repo titles -- never an actual job posting.
+        "how to become",
+        "how to ",
+        "what is ",
+        "introduction to",
+        "complete setup",
+        "setup guide",
+        "step by step",
+        "step-by-step",
+        "a collection of",
+        "tutorial",
+        "ultimate guide",
+        "cheat sheet",
     ]
     noisy_path_patterns = [
         "/jobs?",
@@ -386,6 +422,9 @@ class GenericSearchScraper(BaseScraper):
         root_domain = ".".join(domain.split(".")[-2:])
         path = urlparse(link).path.lower()
         if domain in self.blocked_domains or root_domain in self.blocked_domains:
+            return True
+        # Any "*magazine*"/"*blog*"/"wiki*" host is editorial content, not a job.
+        if any(token in domain for token in ("magazine", "wikipedia", "wikihow")):
             return True
         if any(pattern in path for pattern in self.hard_noisy_path_patterns):
             return True

@@ -72,7 +72,8 @@ def test_known_large_companies_are_dropped_via_size_override():
     # states a headcount. They are dropped; a normal-named company is kept.
     from matching.company_intel import lookup_company_size
 
-    for giant in ("HP", "IBM", "Orange Business", "Hewlett Packard Enterprise"):
+    for giant in ("HP", "IBM", "Orange Business", "Hewlett Packard Enterprise",
+                  "ByteDance", "TikTok", "Whatnot", "Newellbrands", "Newell Brands"):
         override = lookup_company_size(giant)
         assert override is not None, f"{giant} should be in the size blacklist"
         assert exceeds_employee_limit(override[0], MAX_COMPANY_EMPLOYEES) is True
