@@ -72,6 +72,19 @@ class GenericSearchScraper(BaseScraper):
         "google.com",
         "duckduckgo.com",
         "yahoo.com",
+        # India/Pakistan job boards: low-cost-region listings the user bans
+        # outright (pay in PKR/INR). Dropped entirely, not just renamed.
+        "mustakbil.com",
+        "rozee.pk",
+        "naukri.com",
+        "shine.com",
+        "timesjobs.com",
+        "indeed.pk",
+        "indeed.in",
+        "foundit.in",
+        "monsterindia.com",
+        "hirist.com",
+        "instahyre.com",
     }
     weak_aggregator_domains = {
         "indeed.com",
@@ -123,7 +136,6 @@ class GenericSearchScraper(BaseScraper):
         # leaks into the company field via the result title or domain. The real
         # employer is not the site, so fall back to "Unknown" (the posting is kept).
         "eu-startups.com",
-        "mustakbil.com",
         "jobsora.com",
         "neuvoo.com",
         "whatjobs.com",

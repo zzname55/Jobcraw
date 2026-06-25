@@ -11,6 +11,7 @@ from config import DB_PATH, DEFAULT_MIN_SCORE, DEFAULT_SOURCES, LOG_DIR, MAX_COM
 from database.db import JobDatabase
 from database.models import Job
 from matching.company_intel import exceeds_employee_limit
+from matching.exclusions import excluded_low_cost_region
 from exporters.csv_exporter import export_jobs_to_csv
 from exporters.docx_exporter import export_jobs_to_docx
 from exporters.google_sheets_exporter import export_to_google_sheets
@@ -186,8 +187,11 @@ def run(
 
     unique_jobs = deduplicate_jobs(raw_jobs)
     all_scored = sorted(score_jobs(unique_jobs), key=lambda job: job.relevance_score, reverse=True)
-    scored_jobs = [job for job in all_scored if not exceeds_employee_limit(job.company_size, MAX_COMPANY_EMPLOYEES)]
-    removed_large_companies = len(all_scored) - len(scored_jobs)
+    size_ok = [job for job in all_scored if not exceeds_employee_limit(job.company_size, MAX_COMPANY_EMPLOYEES)]
+    removed_large_companies = len(all_scored) - len(size_ok)
+    # Ban India/Pakistan low-cost listings (PKR/INR pay or India/Pakistan location).
+    scored_jobs = [job for job in size_ok if not excluded_low_cost_region(job)[0]]
+    removed_low_cost = len(size_ok) - len(scored_jobs)
     new_jobs = [job for job in scored_jobs if job.deduplication_key not in previously_seen]
     db.upsert_jobs(scored_jobs)
 
@@ -209,6 +213,7 @@ def run(
     console.print(f"Found {len(raw_jobs)} raw jobs.")
     console.print(f"Removed {len(raw_jobs) - len(unique_jobs)} duplicates.")
     console.print(f"Removed {removed_large_companies} jobs from companies over {MAX_COMPANY_EMPLOYEES} employees.")
+    console.print(f"Removed {removed_low_cost} India/Pakistan low-cost listings (PKR/INR pay or location).")
     console.print(f"Scored {len(scored_jobs)} jobs.")
     console.print(f"New since last run: {len(new_jobs)} jobs ({len(previously_seen)} already seen).")
     if incremental:

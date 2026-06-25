@@ -145,16 +145,22 @@ def test_listing_site_brand_does_not_leak_as_company():
     # it must resolve to "Unknown" -- but the job is still kept (not blocked).
     scraper = GenericSearchScraper(limit=10)
     assert scraper._guess_company("AI Workflow & Automation Specialist | EU-Startups", "www.eu-startups.com") == "Unknown"
-    assert scraper._guess_company("N8n Automation Specialist Or AI Automation Developer Job", "mustakbil.com") == "Unknown"
-    # eu-startups / mustakbil are aggregators, NOT in blocked_domains -> kept.
+    # eu-startups is an aggregator, NOT in blocked_domains -> kept.
     assert "eu-startups.com" not in scraper.blocked_domains
-    assert "mustakbil.com" not in scraper.blocked_domains
+
+
+def test_india_pakistan_job_boards_are_blocked():
+    # mustakbil.com et al. are India/Pakistan boards the user bans outright.
+    scraper = GenericSearchScraper(limit=10)
+    for domain in ("mustakbil.com", "rozee.pk", "naukri.com"):
+        assert domain in scraper.blocked_domains
+        assert scraper._is_noisy_result("N8n Automation Specialist Job", f"https://www.{domain}/job/1") is True
 
 
 def test_real_employer_in_title_still_wins_over_board_domain():
     # A genuine "at <Company>" must still be extracted even on a board domain.
     scraper = GenericSearchScraper(limit=10)
-    assert scraper._guess_company("AI Automation Specialist at RealCo GmbH", "mustakbil.com") == "RealCo GmbH"
+    assert scraper._guess_company("AI Automation Specialist at RealCo GmbH", "recruit.net") == "RealCo GmbH"
 
 
 def test_bare_domain_in_title_is_cleaned_to_company_root():
