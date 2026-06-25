@@ -1,4 +1,6 @@
-TARGET_TITLES = [
+from matching.targeting import get_list
+
+_DEFAULT_TARGET_TITLES = [
     "junior applied ai engineer",
     "applied ai engineer",
     "ai automation engineer",
@@ -61,6 +63,9 @@ TARGET_TITLES = [
     "специалист make.com",
     "специалист zapier",
 ]
+
+# Overridable via targeting.yaml ("target_titles"); falls back to the defaults above.
+TARGET_TITLES = get_list("target_titles", _DEFAULT_TARGET_TITLES)
 
 JUNIOR_SIGNALS = [
     "junior",
@@ -278,7 +283,7 @@ UNRELATED_TITLE_SIGNALS = [
 # Roles that are clearly off-target even when the posting mentions AI (e.g. a
 # "Web Developer" or "DevOps Engineer" at an AI company). These are penalized in
 # the title unless the title is an explicit target role.
-OFF_TARGET_TITLE_SIGNALS = [
+_DEFAULT_OFF_TARGET_TITLE_SIGNALS = [
     "web developer",
     "web development",
     "wordpress",
@@ -307,6 +312,9 @@ OFF_TARGET_TITLE_SIGNALS = [
     "support specialist",
     "virtual assistant",
 ]
+
+# Overridable via targeting.yaml ("off_target_title_signals").
+OFF_TARGET_TITLE_SIGNALS = get_list("off_target_title_signals", _DEFAULT_OFF_TARGET_TITLE_SIGNALS)
 
 REGION_KEYWORDS = {
     "dach": [

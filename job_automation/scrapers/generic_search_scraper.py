@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 from config import BING_SEARCH_API_KEY, GOOGLE_SEARCH_API_KEY, SERPAPI_API_KEY, SERPAPI_CAPTURE_DIR, SERPAPI_FETCH_DETAILS
 from database.models import Job
 from matching.keywords import TARGET_TITLES
+from matching.targeting import get_list, get_region_terms
 from matching.region_detection import GEOGRAPHIC_NAMES, is_location_name
 from scrapers.base_scraper import BaseScraper
 from scrapers.jsonld import extract_job_posting, job_posting_fields
@@ -155,42 +156,48 @@ class GenericSearchScraper(BaseScraper):
         "/u/",
     ]
 
+    # Search-query building blocks. All three are overridable via targeting.yaml
+    # so a user can retarget the search without editing code.
+    DEFAULT_PRIORITY_TITLES = [
+        "Junior AI Automation Specialist",
+        "AI Automation Specialist",
+        "Junior Workflow Automation Specialist",
+        "AI Workflow Specialist",
+        "Junior AI Solutions Specialist",
+        "AI Implementation Specialist",
+        "AI Enablement Specialist",
+        "AI Process Automation Specialist",
+        "Business Process Automation Specialist AI",
+        "No-Code AI Automation Specialist",
+        "Low-Code AI Automation Specialist",
+        "n8n Automation Specialist",
+        "Junior n8n Specialist",
+        "AI Agents Specialist",
+        "Junior AI Agent Engineer",
+        "Agentic Systems Engineer",
+        "LLM Automation Specialist",
+        "MCP Server Developer",
+        "MCP Integration Engineer",
+        "AI Tooling Engineer",
+        "RevOps Automation Specialist",
+        "GTM Automation Engineer AI",
+        "Sales Automation Specialist AI",
+        "Operations Automation Specialist",
+    ]
+    DEFAULT_CONCEPT_QUERIES = [
+        '"workflow automation" "AI agents"',
+        '"MCP server" "AI agents"',
+        '"agentic systems" engineer',
+        '"Model Context Protocol" engineer',
+        '"LLM automation" workflow',
+    ]
+    DEFAULT_SEARCH_SITES = ["site:join.com", "site:wellfound.com", "site:ycombinator.com/jobs", "site:berlinstartupjobs.com", "site:germantechjobs.de"]
+
     def build_queries(self, region: str = "worldwide", remote: bool = True) -> list[str]:
         region_terms = self._region_terms(region, remote)
-        priority_titles = [
-            "Junior AI Automation Specialist",
-            "AI Automation Specialist",
-            "Junior Workflow Automation Specialist",
-            "AI Workflow Specialist",
-            "Junior AI Solutions Specialist",
-            "AI Implementation Specialist",
-            "AI Enablement Specialist",
-            "AI Process Automation Specialist",
-            "Business Process Automation Specialist AI",
-            "No-Code AI Automation Specialist",
-            "Low-Code AI Automation Specialist",
-            "n8n Automation Specialist",
-            "Junior n8n Specialist",
-            "AI Agents Specialist",
-            "Junior AI Agent Engineer",
-            "Agentic Systems Engineer",
-            "LLM Automation Specialist",
-            "MCP Server Developer",
-            "MCP Integration Engineer",
-            "AI Tooling Engineer",
-            "RevOps Automation Specialist",
-            "GTM Automation Engineer AI",
-            "Sales Automation Specialist AI",
-            "Operations Automation Specialist",
-        ]
-        concept_queries = [
-            '"workflow automation" "AI agents"',
-            '"MCP server" "AI agents"',
-            '"agentic systems" engineer',
-            '"Model Context Protocol" engineer',
-            '"LLM automation" workflow',
-        ]
-        sites = ["site:join.com", "site:wellfound.com", "site:ycombinator.com/jobs", "site:berlinstartupjobs.com", "site:germantechjobs.de"]
+        priority_titles = get_list("search_priority_titles", self.DEFAULT_PRIORITY_TITLES, lower=False)
+        concept_queries = get_list("search_concept_queries", self.DEFAULT_CONCEPT_QUERIES, lower=False)
+        sites = get_list("search_sites", self.DEFAULT_SEARCH_SITES, lower=False)
         queries: list[str] = []
         for index, title in enumerate(priority_titles):
             region_term = region_terms[index % len(region_terms)]
@@ -210,13 +217,15 @@ class GenericSearchScraper(BaseScraper):
                         return queries
         return queries
 
+    DEFAULT_REGION_TERMS = {
+        "germany": ["Germany", "Remote Germany", "Hybrid Germany"],
+        "dach": ["Germany", "DACH", "Remote DACH", "Austria", "Switzerland"],
+        "europe": ["Germany", "DACH", "Europe", "Remote Europe", "Hybrid Europe"],
+        "worldwide": ["Remote", "Worldwide Remote", "Remote Europe", "Germany", "DACH"],
+    }
+
     def _region_terms(self, region: str, remote: bool) -> list[str]:
-        base_terms = {
-            "germany": ["Germany", "Remote Germany", "Hybrid Germany"],
-            "dach": ["Germany", "DACH", "Remote DACH", "Austria", "Switzerland"],
-            "europe": ["Germany", "DACH", "Europe", "Remote Europe", "Hybrid Europe"],
-            "worldwide": ["Remote", "Worldwide Remote", "Remote Europe", "Germany", "DACH"],
-        }
+        base_terms = get_region_terms(self.DEFAULT_REGION_TERMS)
         terms = base_terms.get(region.lower(), [region])
         if remote and region.lower() == "worldwide":
             terms = ["Remote", "Hybrid", *terms]

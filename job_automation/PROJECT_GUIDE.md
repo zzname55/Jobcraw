@@ -215,6 +215,12 @@ this schema and calls `BaseScraper.normalize_job()`. Key fields:
 | `--new-only` | `false` | Incremental mode: export only postings not seen in a previous run (compared against the SQLite store by deduplication key). Ideal for a daily scheduled run. |
 | `--dashboard` | `false` | Print the Streamlit launch hint. |
 
+**Retargeting without code (`targeting.yaml`).** The lists that decide *what* the tool looks for —
+`target_titles`, `off_target_title_signals`, the search backends' `search_priority_titles` /
+`search_concept_queries` / `search_sites`, and the per-region `region_terms` — live in `targeting.yaml`
+(`TARGETING_FILE`). Edit them to retarget to different roles/regions; delete a key (or the whole file) to
+fall back to the built-in defaults. No Python changes needed.
+
 **Incremental runs & caching.** Every run upserts into SQLite, so `--new-only true` exports just the
 postings that weren't in the DB before this run — a daily job then surfaces only what's genuinely new.
 The conditional HTTP cache (ETag/Last-Modified) is also persisted to `data/http_cache.json`

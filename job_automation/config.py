@@ -68,6 +68,11 @@ HTTP_CACHE_PATH = os.getenv("HTTP_CACHE_PATH", str(DATA_DIR / "http_cache.json")
 # List of target company ATS slugs for the key-free ATS scraper.
 COMPANIES_FILE = Path(os.getenv("COMPANIES_FILE", str(BASE_DIR / "companies.yaml")))
 
+# User-tunable targeting (job titles, off-target signals, search terms per region)
+# so the scraper can be retargeted without editing Python. Missing file -> built-in
+# defaults are used. See matching/targeting.py.
+TARGETING_FILE = Path(os.getenv("TARGETING_FILE", str(BASE_DIR / "targeting.yaml")))
+
 # Extra RSS/Atom job feeds for the generic RSS scraper (comma-separated URLs).
 # Empty means use the scraper's built-in default feed list.
 RSS_FEEDS = [url.strip() for url in os.getenv("RSS_FEEDS", "").split(",") if url.strip()]

@@ -1,0 +1,161 @@
+# Targeting config for the job scraper. Edit these lists to retarget the tool
+# (different roles, regions, exclusions) WITHOUT changing any Python.
+# Delete a key (or the whole file) to fall back to the built-in defaults.
+#
+# target_titles            - roles considered on-target (relevance + scoring)
+# off_target_title_signals - title words that are penalized even if AI is mentioned
+# search_priority_titles   - exact titles the search backends query first
+# search_concept_queries   - free-form search phrases
+# search_sites             - site: filters for the search backends
+# region_terms             - region -> search location strings
+
+target_titles:
+- junior applied ai engineer
+- applied ai engineer
+- ai automation engineer
+- ai automation specialist
+- junior ai automation specialist
+- agentic ai engineer
+- ai agents engineer
+- ai agent engineer
+- llm automation engineer
+- llm engineer
+- no-code automation engineer
+- no-code ai automation specialist
+- low-code automation engineer
+- low-code ai automation specialist
+- n8n automation specialist
+- junior n8n specialist
+- make.com automation engineer
+- zapier automation specialist
+- workflow automation engineer
+- junior workflow automation specialist
+- ai workflow specialist
+- gtm engineer ai
+- gtm automation engineer ai
+- ai solutions engineer
+- junior ai solutions specialist
+- forward deployed ai engineer
+- ai implementation specialist
+- ai enablement specialist
+- ai process automation specialist
+- ai operations engineer
+- business process automation specialist ai
+- ai agents specialist
+- junior ai agent engineer
+- agentic systems engineer
+- llm automation specialist
+- mcp server developer
+- mcp integration engineer
+- ai tooling engineer
+- revops automation specialist
+- sales automation specialist ai
+- operations automation specialist
+- technical solutions engineer ai
+- junior ki engineer
+- ki automatisierung
+- workflow automatisierung
+- no-code automatisierung
+- low-code automatisierung
+- ki agenten
+- ki lösungen
+- werkstudent ki automatisierung
+- praktikum ki automatisierung
+- berufseinsteiger ki
+- младший инженер ии
+- начинающий инженер ии
+- инженер по автоматизации ии
+- специалист по автоматизации ии
+- инженер llm
+- инженер ai agents
+- специалист n8n
+- специалист make.com
+- специалист zapier
+off_target_title_signals:
+- web developer
+- web development
+- wordpress
+- devops
+- sre
+- site reliability
+- account executive
+- account manager
+- business development
+- sales representative
+- sales development
+- graphic
+- ux designer
+- ui designer
+- product designer
+- recruiter
+- talent acquisition
+- billing
+- bookkeeper
+- accountant
+- payroll
+- customer service
+- customer success
+- customer support
+- product support
+- support specialist
+- virtual assistant
+search_priority_titles:
+- Junior AI Automation Specialist
+- AI Automation Specialist
+- Junior Workflow Automation Specialist
+- AI Workflow Specialist
+- Junior AI Solutions Specialist
+- AI Implementation Specialist
+- AI Enablement Specialist
+- AI Process Automation Specialist
+- Business Process Automation Specialist AI
+- No-Code AI Automation Specialist
+- Low-Code AI Automation Specialist
+- n8n Automation Specialist
+- Junior n8n Specialist
+- AI Agents Specialist
+- Junior AI Agent Engineer
+- Agentic Systems Engineer
+- LLM Automation Specialist
+- MCP Server Developer
+- MCP Integration Engineer
+- AI Tooling Engineer
+- RevOps Automation Specialist
+- GTM Automation Engineer AI
+- Sales Automation Specialist AI
+- Operations Automation Specialist
+search_concept_queries:
+- '"workflow automation" "AI agents"'
+- '"MCP server" "AI agents"'
+- '"agentic systems" engineer'
+- '"Model Context Protocol" engineer'
+- '"LLM automation" workflow'
+search_sites:
+- site:join.com
+- site:wellfound.com
+- site:ycombinator.com/jobs
+- site:berlinstartupjobs.com
+- site:germantechjobs.de
+region_terms:
+  germany:
+  - Germany
+  - Remote Germany
+  - Hybrid Germany
+  dach:
+  - Germany
+  - DACH
+  - Remote DACH
+  - Austria
+  - Switzerland
+  europe:
+  - Germany
+  - DACH
+  - Europe
+  - Remote Europe
+  - Hybrid Europe
+  worldwide:
+  - Remote
+  - Worldwide Remote
+  - Remote Europe
+  - Germany
+  - DACH
