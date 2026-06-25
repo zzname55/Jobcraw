@@ -139,7 +139,11 @@ runs before storage so over-200-employee companies are never persisted or shown.
 ## 5. Sources: APIs, scrapers, and placeholders
 
 Sources are registered in `SCRAPER_REGISTRY` in [`main.py`](main.py) and selected with `--sources`.
-Default when `--sources` is omitted: `remoteok, remotive, arbeitnow, weworkremotely, yc, generic`.
+Default when `--sources` is omitted (the **free stack — no SerpAPI**): `duckduckgo, join, workingnomads,
+remoteok, remotive, arbeitnow, weworkremotely, ats, hackernews, rss`. A head-to-head comparison showed
+this free stack matching/beating the paid SerpAPI source, so SerpAPI (`generic`) is no longer a default —
+its credits are reserved for the occasional ATS discovery run (`discover_ats_companies.py`, capped at 5
+searches). Override the default with the `DEFAULT_SOURCES` env var.
 
 | Key (`--sources`) | Type | Needs key? | How it works |
 |---|---|---|---|

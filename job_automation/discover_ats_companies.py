@@ -140,13 +140,18 @@ def _serpapi_search(query: str) -> list[dict]:
 
 @app.command()
 def main(
-    limit: int = typer.Option(12, help="Max SerpAPI queries to run (each costs one credit)."),
+    limit: int = typer.Option(5, help="Max SerpAPI queries to run (each costs one credit). Hard-capped at 5."),
     output: Path | None = typer.Option(None, help="companies.yaml path (defaults to project file)."),
 ) -> None:
     if not SERPAPI_API_KEY:
         console.print("[red]No SERPAPI_API_KEY set. Cannot run discovery.[/]")
         raise typer.Exit(code=1)
 
+    # SerpAPI credits are scarce; never spend more than 5 in a single discovery run.
+    SERPAPI_SEARCH_CAP = 5
+    if limit > SERPAPI_SEARCH_CAP:
+        console.print(f"[yellow]Capping discovery to {SERPAPI_SEARCH_CAP} SerpAPI searches (requested {limit}).[/]")
+        limit = SERPAPI_SEARCH_CAP
     queries = build_queries()[:limit]
     console.print(f"Running {len(queries)} discovery queries (of {len(build_queries())} possible)...")
     all_found: dict[str, set[str]] = {provider: set() for provider in ATS_SITES}

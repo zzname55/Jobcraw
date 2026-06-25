@@ -7,7 +7,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from config import DB_PATH, DEFAULT_MIN_SCORE, LOG_DIR, MAX_COMPANY_EMPLOYEES, MAX_JOBS_PER_SOURCE
+from config import DB_PATH, DEFAULT_MIN_SCORE, DEFAULT_SOURCES, LOG_DIR, MAX_COMPANY_EMPLOYEES, MAX_JOBS_PER_SOURCE
 from database.db import JobDatabase
 from database.models import Job
 from matching.company_intel import exceeds_employee_limit
@@ -81,7 +81,7 @@ def parse_bool(value: str | bool) -> bool:
 
 
 def selected_scrapers(source_names: str | None, limit: int):
-    names = [name.strip().lower() for name in source_names.split(",")] if source_names else ["remoteok", "remotive", "arbeitnow", "weworkremotely", "yc", "generic"]
+    names = [name.strip().lower() for name in source_names.split(",")] if source_names else list(DEFAULT_SOURCES)
     scrapers = []
     for name in names:
         scraper_class = SCRAPER_REGISTRY.get(name)

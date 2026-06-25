@@ -41,6 +41,19 @@ GOOGLE_SEARCH_API_KEY = os.getenv("GOOGLE_SEARCH_API_KEY", "")
 # routing arrives with the discovery loop (roadmap Phase 4).
 SEARCH_BACKEND = os.getenv("SEARCH_BACKEND", "auto").lower()
 
+# Default sources when --sources is omitted. The free stack only: no SerpAPI.
+# SerpAPI ("generic") is intentionally excluded -- a head-to-head comparison
+# showed the free stack matching/beating it, so credits are reserved for the
+# occasional ATS discovery run (discover_ats_companies.py). Override via env.
+DEFAULT_SOURCES = [
+    source.strip()
+    for source in os.getenv(
+        "DEFAULT_SOURCES",
+        "duckduckgo,join,workingnomads,remoteok,remotive,arbeitnow,weworkremotely,ats,hackernews,rss",
+    ).split(",")
+    if source.strip()
+]
+
 # Polite HTTP client knobs (shared by every scraper via scrapers/http_client.py).
 HTTP_MAX_RETRIES = int(os.getenv("HTTP_MAX_RETRIES", "3"))
 HTTP_JITTER_SECONDS = float(os.getenv("HTTP_JITTER_SECONDS", "0.75"))
