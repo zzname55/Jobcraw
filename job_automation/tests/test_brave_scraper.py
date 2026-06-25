@@ -33,6 +33,7 @@ BRAVE_PAYLOAD = {
 def test_brave_parses_results_and_filters_noise(monkeypatch):
     monkeypatch.setattr(config, "BRAVE_SEARCH_API_KEY", "test-key")
     scraper = BraveSearchScraper(limit=1, rate_limit_seconds=0)
+    scraper.validate_links = False  # keep this unit test offline (no HEAD requests)
     monkeypatch.setattr(scraper, "get", lambda url, **kw: _FakeResponse(BRAVE_PAYLOAD))
 
     jobs = scraper.search(region="europe", remote=True)

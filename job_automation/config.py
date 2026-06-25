@@ -83,6 +83,14 @@ COMPANY_SIZES_FILE = Path(os.getenv("COMPANY_SIZES_FILE", str(BASE_DIR / "compan
 # (one extra request per company). Off by default to keep runs fast.
 JOIN_FETCH_COMPANY_SIZE = env_bool("JOIN_FETCH_COMPANY_SIZE", False)
 
+# Validate job links from the free search backends (DuckDuckGo/Brave) with a
+# lightweight HEAD request and drop postings whose URL is provably dead (404/410)
+# so every exported link actually opens. Transient errors/timeouts keep the job
+# (conservative). On by default; set to false to skip the extra requests.
+VALIDATE_JOB_LINKS = env_bool("VALIDATE_JOB_LINKS", True)
+# Per-request timeout (seconds) for the link-validation HEAD/GET check.
+LINK_VALIDATION_TIMEOUT = float(os.getenv("LINK_VALIDATION_TIMEOUT", "8"))
+
 # Extra RSS/Atom job feeds for the generic RSS scraper (comma-separated URLs).
 # Empty means use the scraper's built-in default feed list.
 RSS_FEEDS = [url.strip() for url in os.getenv("RSS_FEEDS", "").split(",") if url.strip()]

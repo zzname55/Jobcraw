@@ -66,6 +66,20 @@ def test_generic_scraper_does_not_use_a_country_as_company():
     assert scraper._guess_company("Data Scientist at Acme Inc", "greenhouse.io") == "Acme Inc"
 
 
+def test_known_large_companies_are_dropped_via_size_override():
+    # Well-known giants (HP, IBM, Orange Business...) are blacklisted in
+    # company_sizes.yaml so the <200 filter bites even when the posting never
+    # states a headcount. They are dropped; a normal-named company is kept.
+    from matching.company_intel import lookup_company_size
+
+    for giant in ("HP", "IBM", "Orange Business", "Hewlett Packard Enterprise"):
+        override = lookup_company_size(giant)
+        assert override is not None, f"{giant} should be in the size blacklist"
+        assert exceeds_employee_limit(override[0], MAX_COMPANY_EMPLOYEES) is True
+
+    assert lookup_company_size("FlowPilot AI") is None
+
+
 def test_mock_pipeline_drops_companies_over_200_employees():
     jobs = MockWebsiteScraper(limit=10).search(region="europe", remote=True)
     scored = sorted(score_jobs(deduplicate_jobs(jobs)), key=lambda job: job.relevance_score, reverse=True)

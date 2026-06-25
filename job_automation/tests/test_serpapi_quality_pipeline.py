@@ -140,6 +140,31 @@ def test_aggregator_domains_yield_unknown_company():
     assert scraper._guess_company("AI Enablement Specialist", "himalayas.app") == "Unknown"
 
 
+def test_listing_site_brand_does_not_leak_as_company():
+    # The listing/news-site name in the title (or the domain) is not the employer;
+    # it must resolve to "Unknown" -- but the job is still kept (not blocked).
+    scraper = GenericSearchScraper(limit=10)
+    assert scraper._guess_company("AI Workflow & Automation Specialist | EU-Startups", "www.eu-startups.com") == "Unknown"
+    assert scraper._guess_company("N8n Automation Specialist Or AI Automation Developer Job", "mustakbil.com") == "Unknown"
+    # eu-startups / mustakbil are aggregators, NOT in blocked_domains -> kept.
+    assert "eu-startups.com" not in scraper.blocked_domains
+    assert "mustakbil.com" not in scraper.blocked_domains
+
+
+def test_real_employer_in_title_still_wins_over_board_domain():
+    # A genuine "at <Company>" must still be extracted even on a board domain.
+    scraper = GenericSearchScraper(limit=10)
+    assert scraper._guess_company("AI Automation Specialist at RealCo GmbH", "mustakbil.com") == "RealCo GmbH"
+
+
+def test_bare_domain_in_title_is_cleaned_to_company_root():
+    # "... - aviareps.com" must not show the raw domain as the company; fall back
+    # to the title-cased domain root instead.
+    scraper = GenericSearchScraper(limit=10)
+    assert scraper._is_bad_company("aviareps.com") is True
+    assert scraper._guess_company("Junior AI Implementation Specialist (f/m/d) - aviareps.com", "aviareps.com") == "Aviareps"
+
+
 def test_location_and_department_are_not_companies():
     scraper = GenericSearchScraper(limit=10)
     assert scraper._guess_company("Software Implementation Specialist - DACH in Hamburg HH", "recruit.net") == "Unknown"
@@ -289,6 +314,43 @@ def test_extraction_fills_excel_ready_fields(monkeypatch):
     assert flowpilot["hours_target_met"] == "yes"
     assert "n8n" in flowpilot["skills"].lower()
     assert flowpilot["dismissed"] == "no"
+
+
+def test_clean_url_strips_trailing_space_and_brackets():
+    scraper = GenericSearchScraper(limit=10)
+    assert scraper._clean_url("https://www.eu-startups.com/job/ai-workflow-automation-specialist ") == (
+        "https://www.eu-startups.com/job/ai-workflow-automation-specialist"
+    )
+    assert scraper._clean_url("<https://example.com/job/123>") == "https://example.com/job/123"
+    assert scraper._clean_url("https://example.com/job/123).") == "https://example.com/job/123"
+
+
+class _FakeHead:
+    def __init__(self, status_code: int) -> None:
+        self.status_code = status_code
+
+    def close(self) -> None:
+        return None
+
+
+def test_dead_link_is_dropped_only_on_404_410(monkeypatch):
+    scraper = GenericSearchScraper(limit=10)
+
+    monkeypatch.setattr(scraper.http.session, "head", lambda *a, **k: _FakeHead(404))
+    assert scraper._link_is_dead("https://example.com/expired") is True
+
+    monkeypatch.setattr(scraper.http.session, "head", lambda *a, **k: _FakeHead(200))
+    assert scraper._link_is_dead("https://example.com/live") is False
+
+    # Blocks and transient failures must NOT drop the job (conservative).
+    monkeypatch.setattr(scraper.http.session, "head", lambda *a, **k: _FakeHead(403))
+    assert scraper._link_is_dead("https://example.com/blocked") is False
+
+    def _boom(*a, **k):
+        raise ConnectionError("dns")
+
+    monkeypatch.setattr(scraper.http.session, "head", _boom)
+    assert scraper._link_is_dead("https://example.com/timeout") is False
 
 
 def _copy_job(job: Job, **updates) -> Job:

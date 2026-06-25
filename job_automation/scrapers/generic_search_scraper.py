@@ -10,7 +10,15 @@ from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 
-from config import BING_SEARCH_API_KEY, GOOGLE_SEARCH_API_KEY, SERPAPI_API_KEY, SERPAPI_CAPTURE_DIR, SERPAPI_FETCH_DETAILS
+from config import (
+    BING_SEARCH_API_KEY,
+    GOOGLE_SEARCH_API_KEY,
+    LINK_VALIDATION_TIMEOUT,
+    SERPAPI_API_KEY,
+    SERPAPI_CAPTURE_DIR,
+    SERPAPI_FETCH_DETAILS,
+    VALIDATE_JOB_LINKS,
+)
 from database.models import Job
 from matching.keywords import TARGET_TITLES
 from matching.targeting import get_list, get_region_terms
@@ -28,6 +36,9 @@ class GenericSearchScraper(BaseScraper):
     # HTTP request (detail-page fetches are free and must not count as credits).
     track_http_usage = False
     usage_provider = "serpapi"
+    # Web-search results are unverified snippets, so drop provably dead links
+    # (404/410). Offline replay (CachedSearchScraper) turns this off.
+    validate_links = True
     blocked_domains = {
         "linkedin.com",
         "x.com",
@@ -108,6 +119,18 @@ class GenericSearchScraper(BaseScraper):
         "hiring.lat",
         "jobspy.net",
         "talent.com",
+        # Listing / startup-news / regional job-aggregator sites whose own brand
+        # leaks into the company field via the result title or domain. The real
+        # employer is not the site, so fall back to "Unknown" (the posting is kept).
+        "eu-startups.com",
+        "mustakbil.com",
+        "jobsora.com",
+        "neuvoo.com",
+        "whatjobs.com",
+        "jobrapido.com",
+        "learn4good.com",
+        "jobserve.com",
+        "snagajob.com",
     }
     geographic_domain_tokens = {
         "egypt",
@@ -290,9 +313,12 @@ class GenericSearchScraper(BaseScraper):
         max_detail_fetches = max(10, self.limit * 5)
         for result in data.get("organic_results", []):
             title = str(result.get("title") or "")
-            link = str(result.get("link") or "")
+            link = self._clean_url(str(result.get("link") or ""))
             snippet = str(result.get("snippet") or "")
             if not title or not link or self._is_noisy_result(title, link):
+                continue
+            if self.validate_links and VALIDATE_JOB_LINKS and self._link_is_dead(link):
+                self.logger.info("dropping dead job link (%s): %s", self._dead_reason, link)
                 continue
             domain = self._domain(link)
             company_name = self._guess_company(title, domain)
@@ -357,6 +383,46 @@ class GenericSearchScraper(BaseScraper):
     def _domain(self, link: str) -> str:
         return urlparse(link).netloc.lower().removeprefix("www.")
 
+    def _clean_url(self, link: str) -> str:
+        """Normalize a result URL so it actually resolves.
+
+        Search snippets sometimes wrap the URL in angle brackets/quotes or leave a
+        trailing space or stray punctuation, which turns an otherwise valid link
+        into a 404. Strip that surrounding noise without touching the path.
+        """
+        cleaned = (link or "").strip().strip("<>\"'").strip()
+        cleaned = cleaned.rstrip(".,;)]}>\"' ")
+        return cleaned
+
+    # Set by ``_link_is_dead`` for logging the reason a link was dropped.
+    _dead_reason: str = ""
+
+    def _link_is_dead(self, link: str) -> bool:
+        """True only when a link is provably dead (HTTP 404/410).
+
+        Uses a lightweight HEAD (falling back to GET if HEAD is not allowed) on the
+        scraper's polite session. Timeouts, connection errors, blocks (401/403/429)
+        and every other status keep the job -- we only drop links the server itself
+        says do not exist, so transient failures never lose a good posting.
+        """
+        self._dead_reason = ""
+        if not link.startswith(("http://", "https://")):
+            return False
+        dead_statuses = {404, 410}
+        try:
+            response = self.http.session.head(link, allow_redirects=True, timeout=LINK_VALIDATION_TIMEOUT)
+            if response.status_code in {405, 501}:  # HEAD not allowed -> try GET
+                response = self.http.session.get(
+                    link, allow_redirects=True, timeout=LINK_VALIDATION_TIMEOUT, stream=True
+                )
+                response.close()
+        except Exception:  # network/DNS/TLS issue -> be conservative and keep it
+            return False
+        if response.status_code in dead_statuses:
+            self._dead_reason = str(response.status_code)
+            return True
+        return False
+
     def _guess_company(self, title: str, domain: str) -> str:
         # Handle English "at X", German "bei X" and "@ X"; stop at separators so a
         # trailing location or call-to-action is not captured as the company.
@@ -367,10 +433,19 @@ class GenericSearchScraper(BaseScraper):
                 return candidate
         ignored_suffixes = {"jazzhr", "greenhouse", "lever", "workable", "ashby", "apply", "careers", "jobs"}
         pieces = [piece.strip() for piece in re.split(r"\s[-|–—]\s", title) if piece.strip()]
+        # "... - <Company> | Built In <City>": the real employer is the piece before
+        # "Built In", so handle that before the board-domain fallback below.
         if len(pieces) >= 2 and "built in" in pieces[-1].lower():
             candidate = self._clean_company(pieces[-2])
             if not self._is_bad_company(candidate):
                 return candidate
+        # Known listing / aggregator domain: neither the title brand (e.g. the
+        # trailing "| EU-Startups") nor the domain is the real employer, so stop
+        # here with "Unknown" instead of leaking the board's name. The job itself is
+        # still kept -- these domains are NOT in ``blocked_domains``.
+        root_domain = ".".join(domain.split(".")[-2:])
+        if domain in self.job_board_domains or root_domain in self.job_board_domains:
+            return "Unknown"
         for candidate in reversed(pieces[1:]):
             candidate_key = candidate.lower()
             if candidate_key in ignored_suffixes or re.search(r"\b(remote|hybrid|job|jobs|career|careers)\b", candidate_key):
@@ -379,9 +454,6 @@ class GenericSearchScraper(BaseScraper):
             if self._is_bad_company(cleaned):
                 continue
             return cleaned
-        root_domain = ".".join(domain.split(".")[-2:])
-        if domain in self.job_board_domains or root_domain in self.job_board_domains:
-            return "Unknown"
         parts = [
             part
             for part in domain.split(".")
@@ -412,6 +484,11 @@ class GenericSearchScraper(BaseScraper):
             return True
         letters = sum(character.isalpha() for character in candidate)
         if letters < 2:  # pure job ids / numbers / punctuation
+            return True
+        # A bare domain leaked from the title ("aviareps.com", "acme.io") is not a
+        # clean company name; reject it so the caller falls back to the title-cased
+        # domain root instead ("Aviareps").
+        if re.fullmatch(r"[a-z0-9][a-z0-9-]*\.[a-z]{2,}(?:\.[a-z]{2,})?", key):
             return True
         tokens = re.findall(r"[a-zäöüß0-9&.+-]+", key)
         if tokens and tokens[0] in GEOGRAPHIC_NAMES:  # leading place, e.g. "DACH in Hamburg"
@@ -493,6 +570,7 @@ class CachedSearchScraper(GenericSearchScraper):
     source_name = "cached_search"
     source_type = "cached"
     fetch_details = False
+    validate_links = False  # offline replay must not make network calls
 
     def search(self, region: str = "worldwide", remote: bool = True) -> list[Job]:
         if not SERPAPI_CAPTURE_DIR:

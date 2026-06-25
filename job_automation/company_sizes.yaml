@@ -1,4 +1,4 @@
-# Curated company -> employee-count overrides.
+# Curated company -> employee-count overrides (a.k.a. the "too big" blacklist).
 #
 # Most job postings carry no parseable headcount, so the <200-employee filter
 # can't bite. List companies here (by name; legal suffixes like GmbH/AG/Inc and
@@ -6,20 +6,81 @@
 # can be a bare number (e.g. 90000) or a range/label (e.g. "11-50", "1,001+").
 # Anything whose lower bound exceeds MAX_COMPANY_EMPLOYEES (200) is dropped.
 #
-# Add your own as you discover them. A few obvious large companies are seeded so
-# they never slip back into the export:
+# Targeting goal stays "under 200 employees", with a bit of tolerance up to ~300
+# for borderline companies whose size we don't know (those are kept for manual
+# review). Companies listed below are known to be far larger than that, so they
+# are always dropped from the export.
+#
+# Add your own as you discover them. Obvious large companies are seeded so they
+# never slip back into the export:
 
+# --- German / European industrials & enterprises ---
 Siemens Energy: 90000
 Siemens: 300000
+Bosch: 400000
+SAP: 100000
+Deutsche Telekom: 200000
+Telekom: 200000
+Vodafone: 90000
+Allianz: 150000
+Bayer: 100000
+BASF: 110000
+Volkswagen: 680000
+BMW: 150000
+Mercedes-Benz: 170000
+Daimler: 170000
+Continental: 200000
+Deutsche Bank: 90000
+Capgemini: 350000
+
+# --- Global tech giants ---
+Amazon: 1500000
+Amazon Web Services: 1500000
+AWS: 1500000
+Google: 180000
+Alphabet: 180000
+Microsoft: 220000
+Apple: 160000
+Meta: 67000
+Facebook: 67000
+IBM: 280000
+Oracle: 150000
+Intel: 120000
+Cisco: 80000
+Dell: 100000
+HP: 55000
+HPE: 60000
+Hewlett Packard: 55000
+Hewlett-Packard: 55000
+Hewlett Packard Enterprise: 60000
+Nvidia: 30000
+Adobe: 30000
+Salesforce: 75000
+SAP SE: 100000
+Atlassian: 12000
+Uber: 32000
+Airbnb: 7000
+Spotify: 9000
+Shopify: 8000
+Stripe: 8000
+Datadog: 5000
+Snowflake: 7000
+Twilio: 5000
+Cloudflare: 4000
+Palantir: 3500
 Reddit: 2000
 Lyft: 22000
-Palantir: 3500
-SAP: 100000
-Bosch: 400000
-Deloitte: 450000
-Accenture: 740000
-Amazon: 1500000
-Google: 180000
-Microsoft: 220000
 Boomi: 2000
 Kong: 700
+
+# --- Consulting / IT services giants ---
+Deloitte: 450000
+Accenture: 740000
+Infosys: 340000
+Tata Consultancy Services: 600000
+TCS: 600000
+Wipro: 250000
+Cognizant: 350000
+HCL: 220000
+Orange: 130000
+Orange Business: 130000

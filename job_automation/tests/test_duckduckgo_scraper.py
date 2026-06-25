@@ -39,6 +39,7 @@ def _install_fake_ddgs(monkeypatch):
 def test_duckduckgo_parses_results_and_filters_noise(monkeypatch):
     _install_fake_ddgs(monkeypatch)
     scraper = DuckDuckGoSearchScraper(limit=1, rate_limit_seconds=0)
+    scraper.validate_links = False  # keep this unit test offline (no HEAD requests)
     assert scraper.fetch_details is False  # snippet-only, offline
 
     jobs = scraper.search(region="europe", remote=True)
