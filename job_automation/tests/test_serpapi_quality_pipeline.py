@@ -312,7 +312,9 @@ def test_extraction_fills_excel_ready_fields(monkeypatch):
     assert flowpilot["title_fit_score"] > 0
     assert flowpilot["skill_fit_score"] > 0
     assert flowpilot["remote_type"] == "remote"
-    assert flowpilot["location"] == "Remote Germany"
+    # Location holds the real place (country), not the work mode; "remote" stays in
+    # the remote_type column.
+    assert flowpilot["location"] == "Germany"
     assert flowpilot["city"] == "Unknown"
     assert flowpilot["country"] == "germany"
     assert flowpilot["company_size"] == "11-50"
