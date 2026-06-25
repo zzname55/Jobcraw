@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import random
 import re
+import time
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -85,6 +87,14 @@ class GenericSearchScraper(BaseScraper):
         "social-networking.me",
         "railway.app",
         "page.gd",
+        "wuzzuf.net",
+        "simplyhired.com",
+        "euremotejobs.com",
+        "cvbankas.lt",
+        "recomlinked.com",
+        "hiring.lat",
+        "jobspy.net",
+        "talent.com",
     }
     geographic_domain_tokens = {
         "egypt",
@@ -449,3 +459,51 @@ class CachedSearchScraper(GenericSearchScraper):
             if len(jobs) >= self.limit:
                 break
         return jobs[: self.limit]
+
+
+class DuckDuckGoSearchScraper(GenericSearchScraper):
+    """Free web-search backend (DuckDuckGo via the ``ddgs`` library).
+
+    Runs the same target-title queries as the SerpAPI source but against
+    DuckDuckGo -- no API key, no credits -- and reuses all of the generic
+    scraper's noise filtering, company extraction and scoring. This is the closest
+    free stand-in for SerpAPI's "search the whole web" strategy. Detail-page
+    fetching is off by default (snippets only) to keep runs fast; DuckDuckGo
+    rate-limits aggressive use, so queries are paced and ``--limit`` caps them.
+    """
+
+    source_name = "duckduckgo_search"
+    source_type = "search_free"
+    fetch_details = False
+    results_per_query = 12
+
+    def search(self, region: str = "worldwide", remote: bool = True) -> list[Job]:
+        try:
+            from ddgs import DDGS
+        except ImportError:
+            self.logger.info("ddgs not installed (pip install ddgs); skipping DuckDuckGo search.")
+            return []
+
+        jobs: list[Job] = []
+        with DDGS() as ddgs:
+            for index, query in enumerate(self.build_queries(region, remote)):
+                try:
+                    raw_results = list(ddgs.text(query, max_results=self.results_per_query))
+                except Exception as error:
+                    self.handle_errors(error)
+                    self._pace()
+                    continue
+                data = {
+                    "organic_results": [
+                        {"title": item.get("title", ""), "link": item.get("href", ""), "snippet": item.get("body", "")}
+                        for item in raw_results
+                    ]
+                }
+                self._capture_response(index, query, data)
+                jobs.extend(self._parse_serpapi_results(data, query))
+                self._pace()
+        return jobs
+
+    def _pace(self) -> None:
+        if self.rate_limit_seconds > 0:
+            time.sleep(self.rate_limit_seconds + random.uniform(0, 0.5))
