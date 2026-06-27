@@ -1,0 +1,34 @@
+# ---- Secrets / local environment (NEVER commit) ----
+.env
+*.env
+**/.env
+!*.env.example
+!**/.env.example
+
+# ---- Local agent / tooling config (not part of the project) ----
+.claude/
+.agents/
+
+# ---- Python ----
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytmp/
+
+# ---- Local databases / generated artifacts ----
+*.db
+*.sqlite
+**/data/exports/
+**/data/logs/
+**/data/serpapi_capture/
+**/data/ddg_capture/
+**/data/http_cache.json
+**/data/http_cache.tmp
+**/data/usage.json
+**/data/usage.tmp
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
